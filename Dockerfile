@@ -27,7 +27,7 @@ WORKDIR /app/doctor
 
 COPY Makefile ./
 
-COPY main.go go.mod go.sum ./
+COPY *.go go.mod go.sum ./
 
 COPY .env ./
 
