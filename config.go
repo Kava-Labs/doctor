@@ -25,18 +25,20 @@ var (
 	// cli flags
 	// note the majority of configuration values are
 	// parsed from a json file and/or environment variables
-	configFilepathFlag  = flag.String(ConfigFilepathFlagName, "~/.kava/doctor/config.json", "filepath to json config file to use for running doctor")
-	debugModeFlag       = flag.Bool("debug", false, "controls whether debug logging is enabled")
-	interactiveModeFlag = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
+	configFilepathFlag                   = flag.String(ConfigFilepathFlagName, "~/.kava/doctor/config.json", "filepath to json config file to use for running doctor")
+	debugModeFlag                        = flag.Bool("debug", false, "controls whether debug logging is enabled")
+	interactiveModeFlag                  = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
+	defaultMonitoringIntervalSecondsFlag = flag.Int("default-monitoring-interval-seconds", 5, "Default interval doctor will use for the various monitoring routines")
 )
 
 // DoctorConfig wraps values used to configure
 // the execution of the doctor program
 type DoctorConfig struct {
-	KavaNodeRPCURL  string
-	InteractiveMode bool
-	DebugMode       bool
-	Logger          *log.Logger
+	KavaNodeRPCURL                   string
+	InteractiveMode                  bool
+	DebugMode                        bool
+	DefaultMonitoringIntervalSeconds int
+	Logger                           *log.Logger
 }
 
 // GetDoctorConfig gets an instance of DoctorConfig
@@ -96,9 +98,10 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 	logger.Printf("doctor raw config %+v", viper.AllSettings())
 
 	return &DoctorConfig{
-		InteractiveMode: viper.GetBool("interactive"),
-		KavaNodeRPCURL:  viper.GetString("KAVA_RPC_URL"),
-		DebugMode:       debugMode,
-		Logger:          logger,
+		InteractiveMode:                  viper.GetBool("interactive"),
+		KavaNodeRPCURL:                   viper.GetString("kava_rpc_url"),
+		DefaultMonitoringIntervalSeconds: viper.GetInt("default_monitoring_interval_seconds"),
+		DebugMode:                        debugMode,
+		Logger:                           logger,
 	}, nil
 }

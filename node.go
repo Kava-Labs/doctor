@@ -17,7 +17,8 @@ import (
 // NodeClientConfig wraps config
 // used for creating a NodeClient
 type NodeClientConfig struct {
-	RPCEndpoint string
+	RPCEndpoint                      string
+	DefaultMonitoringIntervalSeconds int
 }
 
 // NodeClient provides methods
@@ -25,6 +26,7 @@ type NodeClientConfig struct {
 // API and OS shell for a given node
 type NodeClient struct {
 	*kava.Client
+	config NodeClientConfig
 }
 
 // NewNodeCLient creates and returns a new node client
@@ -45,7 +47,8 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 	}
 
 	return &NodeClient{
-		client,
+		config: config,
+		Client: client,
 	}, nil
 }
 
@@ -54,7 +57,7 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 func (nc *NodeClient) WatchSyncStatus(ctx context.Context, observedBlockHeights chan<- int64, logMessages chan<- string) {
 	// create channel that will emit
 	// an event every 10 seconds
-	ticker := time.NewTicker(10 * time.Second).C
+	ticker := time.NewTicker(time.Duration(nc.config.DefaultMonitoringIntervalSeconds) * time.Second).C
 
 	for {
 		select {
