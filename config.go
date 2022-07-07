@@ -18,17 +18,24 @@ import (
 const (
 	DefaultDoctorConfigDirectory          = "~/.kava/doctor"
 	DoctorConfigEnvironmentVariablePrefix = "DOCTOR"
-	ConfigFilepathFlagName                = "config-filepath"
+	// use snake_casing to match json or
+	// environment variable provided configuration
+	ConfigFilepathFlagName                   = "config_filepath"
+	DefaultMonitoringIntervalSecondsFlagName = "default_monitoring_interval_seconds"
+	KavaAPIAddressFlagName                   = "kava_api_address"
 )
 
 var (
 	// cli flags
-	// note the majority of configuration values are
+	// while the majority of time configuration values will be
 	// parsed from a json file and/or environment variables
+	// specifying these allows setting default values and
+	// auto populates help text in the output of --help
 	configFilepathFlag                   = flag.String(ConfigFilepathFlagName, "~/.kava/doctor/config.json", "filepath to json config file to use for running doctor")
+	kavaAPIAddressFlag                   = flag.String(KavaAPIAddressFlagName, "https://rpc.data.kava.io:443", "filepath to json config file to use for running doctor")
 	debugModeFlag                        = flag.Bool("debug", false, "controls whether debug logging is enabled")
 	interactiveModeFlag                  = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
-	defaultMonitoringIntervalSecondsFlag = flag.Int("default-monitoring-interval-seconds", 5, "Default interval doctor will use for the various monitoring routines")
+	defaultMonitoringIntervalSecondsFlag = flag.Int(DefaultMonitoringIntervalSecondsFlagName, 5, "Default interval doctor will use for the various monitoring routines")
 )
 
 // DoctorConfig wraps values used to configure
@@ -99,8 +106,8 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 
 	return &DoctorConfig{
 		InteractiveMode:                  viper.GetBool("interactive"),
-		KavaNodeRPCURL:                   viper.GetString("kava_rpc_url"),
-		DefaultMonitoringIntervalSeconds: viper.GetInt("default_monitoring_interval_seconds"),
+		KavaNodeRPCURL:                   viper.GetString(KavaAPIAddressFlagName),
+		DefaultMonitoringIntervalSeconds: viper.GetInt(DefaultMonitoringIntervalSecondsFlagName),
 		DebugMode:                        debugMode,
 		Logger:                           logger,
 	}, nil

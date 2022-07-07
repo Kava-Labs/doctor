@@ -50,7 +50,13 @@ install:
 # start dockerized host that has both the kava and doctor processes
 # running for testing and development
 run:
-	docker run --name ${CONTAINER_NAME} -d --rm -it --env-file ./.env -p ${KAVA_RPC_DOCKER_HOST_PORT}:${KAVA_RPC_PORT} ${IMAGE_NAME}:${LOCAL_IMAGE_TAG}
+	docker run --name ${CONTAINER_NAME}-$$(date +%s) -d -it --env-file ./.env -p ${KAVA_RPC_DOCKER_HOST_PORT}:${KAVA_RPC_PORT} -p ${KAVA_API_DOCKER_HOST_PORT}:${KAVA_API_PORT} ${IMAGE_NAME}:${LOCAL_IMAGE_TAG}
+
+# follows the logs for the docker host where
+# the kava and doctor services are running
+logs:
+# only follow logs if the container is running
+	docker ps | grep ${CONTAINER_NAME} | awk '{ print $$1 }'| xargs -r docker logs -f $$1
 
 # execute unit tests locally and integration tests
 # against docker host environment
@@ -60,7 +66,13 @@ test:
 # stop the doctor test and development container
 stop:
 # only stop the container if its running
-	docker ps | grep ${CONTAINER_NAME} | awk '{ print $$1 }'| xargs -r docker kill -s SIGKILL ${CONTAINER_NAME}
+# run the command recursively to work around false negatives
+# that occur when trying to stop a container that is using
+# significant host resources
+	docker ps | grep ${CONTAINER_NAME} | awk '{ print $$1 }'| xargs -r docker kill -s SIGKILL $$1 || $(MAKE) stop
 
 # rebuild and restart the test and development container
 refresh: build stop run
+
+# restart the test and development container
+restart: stop run

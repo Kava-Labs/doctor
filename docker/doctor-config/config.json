@@ -1,0 +1,6 @@
+{
+    "kava_api_address": "http://localhost:26657",
+    "debug": true,
+    "interactive": false,
+    "default_monitoring_interval_seconds": 20
+}

@@ -59,6 +59,7 @@ COPY --from=go-builder /go/bin/doctor /app/bin/doctor
 
 # copy config templates to automate setup
 COPY --from=go-builder /app/doctor/chain-configs /app/templates
+COPY --from=go-builder /app/doctor/doctor-config/config.json /root/.kava/doctor/config.json
 
 # copy scripts to run services
 COPY --from=go-builder /app/doctor/supervisord/start-services.sh /app/bin/start-services.sh
