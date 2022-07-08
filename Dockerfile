@@ -29,6 +29,8 @@ COPY Makefile ./
 
 COPY *.go go.mod go.sum ./
 
+COPY clients/ clients/
+
 COPY .env ./
 
 RUN make install

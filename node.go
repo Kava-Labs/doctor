@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kava-labs/rosetta-kava/kava"
+	"github.com/kava-labs/doctor/clients/kava"
 )
 
 // NodeClientConfig wraps config
@@ -32,15 +32,9 @@ type NodeClient struct {
 // NewNodeCLient creates and returns a new node client
 // using the provided configuration
 func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
-	http, err := kava.NewHTTPClient(config.RPCEndpoint)
-
-	if err != nil {
-		panic(fmt.Errorf("%w: could not initialize http client", err))
-	}
-
-	accountBalanceFactory := kava.NewRPCBalanceFactory(http)
-
-	client, err := kava.NewClient(http, accountBalanceFactory)
+	kavaClient, err := kava.New(kava.ClientConfig{
+		JSONRPCURL: config.RPCEndpoint,
+	})
 
 	if err != nil {
 		panic(fmt.Errorf("%w: could not initialize kava client", err))
@@ -48,7 +42,7 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 
 	return &NodeClient{
 		config: config,
-		Client: client,
+		Client: kavaClient,
 	}, nil
 }
 
@@ -64,7 +58,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, observedBlockHeights 
 		case <-ctx.Done():
 			return
 		case <-ticker:
-			_, _, _, status, _, err := nc.Status(ctx)
+			nodeState, err := nc.GetNodeState()
 
 			if err != nil {
 				// log error, but don't block the monitoring
@@ -78,7 +72,8 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, observedBlockHeights 
 			}
 
 			go func() {
-				observedBlockHeights <- *status.CurrentIndex
+				logMessages <- fmt.Sprintf("node state %+v", nodeState)
+				observedBlockHeights <- nodeState.SyncInfo.LatestBlockHeight
 			}()
 		}
 	}
