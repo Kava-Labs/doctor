@@ -14,6 +14,14 @@ var (
 	ctx = context.Background()
 )
 
+// MetricReadOnlyChannels is a collection
+// of read only channels used for functions
+// that need to display and collect metrics
+// related to the health of a kava node
+type MetricReadOnlyChannels struct {
+	SyncStatusMetrics <-chan SyncStatusMetrics
+}
+
 func main() {
 	// set up channel for sending log messages
 	// from async node health watching routines to
@@ -23,7 +31,13 @@ func main() {
 	// set up channel for sending updated
 	// node sync status to metric collection and display
 	// endpoints
-	observedBlockHeights := make(chan int64)
+	syncStatusMetrics := make(chan SyncStatusMetrics)
+
+	// collect all metric channels together for the
+	// gui or cli functions to watch and display
+	metricReadOnlyChannels := MetricReadOnlyChannels{
+		SyncStatusMetrics: syncStatusMetrics,
+	}
 
 	// parse desired configuration
 	config, err := GetDoctorConfig()
@@ -54,7 +68,7 @@ func main() {
 
 	// watch the node's sync status endpoint
 	// to measure it's block syncing performance
-	go nodeClient.WatchSyncStatus(ctx, observedBlockHeights, logMessages)
+	go nodeClient.WatchSyncStatus(ctx, syncStatusMetrics, logMessages)
 
 	// setup event handlers for interactive mode
 	if config.InteractiveMode {
@@ -71,7 +85,7 @@ func main() {
 		// they are received and evaluated
 		// and allow the user to interactively
 		// adjust the display and measurement
-		err = gui.Watch(observedBlockHeights, logMessages, config.KavaNodeRPCURL)
+		err = gui.Watch(metricReadOnlyChannels, logMessages, config.KavaNodeRPCURL)
 
 		if err != nil {
 			panic(fmt.Errorf("error %s attempting to watch node in interactive mode ", err))
@@ -96,7 +110,7 @@ func main() {
 		go func() {
 			defer close(errChan)
 
-			err = cli.Watch(observedBlockHeights, logMessages, config.KavaNodeRPCURL)
+			err = cli.Watch(metricReadOnlyChannels, logMessages, config.KavaNodeRPCURL)
 
 			if err != nil {
 				errChan <- fmt.Errorf("error %s attempting to watch node in non-interactive mode ", err)

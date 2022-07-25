@@ -46,9 +46,16 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 	}, nil
 }
 
+// SyncStatusMetrics wraps metrics collected
+// by the doctor related to the nodes sync state
+type SyncStatusMetrics struct {
+	MeasurementLatencyMilliseconds int64
+	SyncStatus                     kava.SyncInfo
+}
+
 // WatchSyncStatus watches  (until the context is cancelled)
 // the sync status for the node and sends any new data to the provided channel.
-func (nc *NodeClient) WatchSyncStatus(ctx context.Context, observedBlockHeights chan<- int64, logMessages chan<- string) {
+func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics chan<- SyncStatusMetrics, logMessages chan<- string) {
 	// create channel that will emit
 	// an event every 10 seconds
 	ticker := time.NewTicker(time.Duration(nc.config.DefaultMonitoringIntervalSeconds) * time.Second).C
@@ -58,7 +65,12 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, observedBlockHeights 
 		case <-ctx.Done():
 			return
 		case <-ticker:
+			// get the current sync status of the node
+			// timing how long it takes for the node
+			// to respond to the request as well
+			startTime := time.Now()
 			nodeState, err := nc.GetNodeState()
+			endTime := time.Now()
 
 			if err != nil {
 				// log error, but don't block the monitoring
@@ -71,9 +83,14 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, observedBlockHeights 
 				continue
 			}
 
+			metrics := SyncStatusMetrics{
+				SyncStatus:                     nodeState.SyncInfo,
+				MeasurementLatencyMilliseconds: endTime.Sub(startTime).Milliseconds(),
+			}
+
 			go func() {
 				logMessages <- fmt.Sprintf("node state %+v", nodeState)
-				observedBlockHeights <- nodeState.SyncInfo.LatestBlockHeight
+				syncStatusMetrics <- metrics
 			}()
 		}
 	}

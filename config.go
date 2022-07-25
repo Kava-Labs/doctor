@@ -32,7 +32,7 @@ var (
 	// specifying these allows setting default values and
 	// auto populates help text in the output of --help
 	configFilepathFlag                   = flag.String(ConfigFilepathFlagName, "~/.kava/doctor/config.json", "filepath to json config file to use for running doctor")
-	kavaAPIAddressFlag                   = flag.String(KavaAPIAddressFlagName, "https://rpc.data.kava.io:443", "filepath to json config file to use for running doctor")
+	kavaAPIAddressFlag                   = flag.String(KavaAPIAddressFlagName, "https://rpc.data.kava.io", "filepath to json config file to use for running doctor")
 	debugModeFlag                        = flag.Bool("debug", false, "controls whether debug logging is enabled")
 	interactiveModeFlag                  = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
 	defaultMonitoringIntervalSecondsFlag = flag.Int(DefaultMonitoringIntervalSecondsFlagName, 5, "Default interval doctor will use for the various monitoring routines")

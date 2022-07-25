@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
 )
 
 // CLIConfig wraps values
@@ -26,15 +25,15 @@ type CLI struct {
 
 // Watch watches for new measurements and log messages for the kava node with the
 // specified rpc api url, outputting them to the cli device in the desired format
-func (c *CLI) Watch(kavaNodeReadings <-chan int64, logMessages <-chan string, kavaNodeRPCURL string) error {
+func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <-chan string, kavaNodeRPCURL string) error {
 	// event handlers for non-interactive mode
 	// loop over events
 	for {
 		select {
-		case newBlockHeight := <-kavaNodeReadings:
+		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
 			// TODO: log to configured backends (stdout, file and or cloudwatch)
 			// for now log new monitoring data to stdout by default
-			fmt.Printf("%s is synched up to block %d @ %d\n", kavaNodeRPCURL, newBlockHeight, time.Now().Unix())
+			fmt.Printf("%s is synched up to block %d, status check took %d milliseconds\n", kavaNodeRPCURL, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.MeasurementLatencyMilliseconds)
 			// TODO: check to see if we should log this to a file
 			// TODO: check to see if we should this to cloudwatch
 		case logMessage := <-logMessages:

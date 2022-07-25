@@ -34,7 +34,7 @@ type GUI struct {
 
 // Watch watches for new measurements and log messages for the kava node with the
 // specified rpc api url, outputting them to the gui device in the desired format
-func (g *GUI) Watch(kavaNodeReadings <-chan int64, logMessages <-chan string, kavaNodeRPCURL string) error {
+func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <-chan string, kavaNodeRPCURL string) error {
 	tickerCount := 1
 
 	// create channel to subscribe to
@@ -69,14 +69,14 @@ func (g *GUI) Watch(kavaNodeReadings <-chan int64, logMessages <-chan string, ka
 				ui.Render(g.grid)
 			}
 		// events triggered by new data
-		case newBlockHeight := <-kavaNodeReadings:
+		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
 			updatedParagraph := fmt.Sprintf(`
 			Latest Block Height %d
-			Other Metric %d
-			`, newBlockHeight, 6)
+			Sync Status Latency (milliseconds) %d
+			`, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.MeasurementLatencyMilliseconds)
 			g.draw(tickerCount, updatedParagraph)
 		case logMessage := <-logMessages:
-			// TODO: seperate channels
+			// TODO: separate channels
 			// for debug only log messages?
 			// if !debugMode {
 			// 	continue
