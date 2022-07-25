@@ -58,7 +58,7 @@ type SyncStatusMetrics struct {
 // the sync status for the node and sends any new data to the provided channel.
 func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics chan<- SyncStatusMetrics, logMessages chan<- string) {
 	// create channel that will emit
-	// an event every 10 seconds
+	// an event every DefaultMonitoringIntervalSeconds seconds
 	ticker := time.NewTicker(time.Duration(nc.config.DefaultMonitoringIntervalSeconds) * time.Second).C
 
 	for {

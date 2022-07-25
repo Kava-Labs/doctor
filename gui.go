@@ -19,6 +19,8 @@ import (
 // display mode of the doctor program
 type GUIConfig struct {
 	DebugLoggingEnabled bool
+	KavaURL             string
+	RefreshRateSeconds  int
 }
 
 // GUI controls the display
@@ -26,9 +28,13 @@ type GUIConfig struct {
 // using asci interactive tty
 // output devices
 type GUI struct {
-	grid            *ui.Grid
-	updateParagraph func(count int)
-	draw            func(count int, paragraph string)
+	grid               *ui.Grid
+	updateParagraph    func(count int)
+	draw               func(count int, paragraph string)
+	newMessageFunc     func(message string)
+	kavaEndpoint       *Endpoint
+	refreshRateSeconds int
+	debugMode          bool
 	*log.Logger
 }
 
@@ -39,12 +45,11 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 
 	// create channel to subscribe to
 	// user input
-
 	uiEvents := ui.PollEvents()
 
 	// create channel that will emit
 	// an event every second
-	ticker := time.NewTicker(time.Second).C
+	ticker := time.NewTicker(time.Second * time.Duration(g.refreshRateSeconds)).C
 
 	for {
 		select {
@@ -57,8 +62,8 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				ui.Close()
 				return nil
 			case "c":
-				updatedParagraph := fmt.Sprintf(`
-				Current Config %+v
+				updatedParagraph := fmt.Sprintf(
+					`Current Config %+v
 				`, viper.AllSettings())
 				g.draw(tickerCount, updatedParagraph)
 				time.Sleep(1 * time.Second)
@@ -70,20 +75,21 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 			}
 		// events triggered by new data
 		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
-			updatedParagraph := fmt.Sprintf(`
-			Latest Block Height %d
+			updatedParagraph := fmt.Sprintf(
+				`Latest Block Height %d
 			Seconds Behind Live %d
 			Sync Status Latency (milliseconds) %d
 			`, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, syncStatusMetrics.MeasurementLatencyMilliseconds)
 			g.draw(tickerCount, updatedParagraph)
+		// events triggered by debug worthy events
 		case logMessage := <-logMessages:
 			// TODO: separate channels
 			// for debug only log messages?
-			// if !debugMode {
-			// 	continue
-			// }
-			g.draw(tickerCount, logMessage)
-			time.Sleep(2 * time.Second)
+			if !g.debugMode {
+				continue
+			}
+
+			g.newMessageFunc(logMessage)
 		// events triggered on a regular time based interval
 		case <-ticker:
 			g.updateParagraph(tickerCount)
@@ -99,40 +105,30 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 	}
 
 	// uppper left box
-	p := widgets.NewParagraph()
-	p.Title = "Text Box"
-	p.Text = "PRESS q TO QUIT DEMO"
-	p.SetRect(0, 0, 50, 5)
-	p.TextStyle.Fg = ui.ColorWhite
-	p.BorderStyle.Fg = ui.ColorCyan
+	syncMetrics := widgets.NewParagraph()
+	syncMetrics.Title = "Sync Metrics"
+	syncMetrics.Text = "PRESS q TO QUIT DEMO"
+	syncMetrics.SetRect(0, 0, 50, 5)
+	syncMetrics.TextStyle.Fg = ui.ColorWhite
+	syncMetrics.BorderStyle.Fg = ui.ColorCyan
 
 	updateParagraph := func(count int) {
 		if count%2 == 0 {
-			p.TextStyle.Fg = ui.ColorRed
+			syncMetrics.TextStyle.Fg = ui.ColorRed
 		} else {
-			p.TextStyle.Fg = ui.ColorWhite
+			syncMetrics.TextStyle.Fg = ui.ColorWhite
 		}
 	}
 
 	// upper right box
-	listData := []string{
-		"[0] gizak/termui",
-		"[1] editbox.go",
-		"[2] interrupt.go",
-		"[3] keyboard.go",
-		"[4] output.go",
-		"[5] random_out.go",
-		"[6] dashboard.go",
-		"[7] nsf/termbox-go",
-	}
+	messages := widgets.NewParagraph()
+	messages.Title = "Messages"
+	messages.Text = ""
+	messages.SetRect(0, 0, 50, 5)
+	messages.TextStyle.Fg = ui.ColorYellow
+	messages.BorderStyle.Fg = ui.ColorMagenta
 
 	// lower left box
-	l := widgets.NewList()
-	l.Title = "List"
-	l.Rows = listData
-	l.SetRect(0, 5, 25, 12)
-	l.TextStyle.Fg = ui.ColorYellow
-
 	g := widgets.NewGauge()
 	g.Title = "Gauge"
 	g.Percent = 50
@@ -202,8 +198,8 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 
 	grid.Set(
 		ui.NewRow(1.0/2,
-			ui.NewCol(1.0/2, p),
-			ui.NewCol(1.0/2, l),
+			ui.NewCol(1.0/2, syncMetrics),
+			ui.NewCol(1.0/2, messages),
 		),
 		ui.NewRow(1.0/2,
 			ui.NewCol(1.0/4, g),
@@ -220,23 +216,33 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 	// there is new data
 	draw := func(count int, paragraph string) {
 		g.Percent = count % 101
-		l.Rows = listData[count%9:]
 		slg.Sparklines[0].Data = sparklineData[:30+count%50]
 		slg.Sparklines[1].Data = sparklineData[:35+count%50]
 		lc.Data[0] = sinData[count/2%220:]
 		lc2.Data[0] = sinData[2*count%220:]
 		bc.Data = barchartData[count/2%10:]
 		if paragraph != "" {
-			p.Text = paragraph
+			syncMetrics.Text = paragraph
 		}
 		ui.Render(grid)
 	}
+	newMessage := func(message string) {
+		messages.Text = message
+		ui.Render(grid)
+	}
+
 	// show the initial ui to the user
 	ui.Render(grid)
 
+	endpoint := NewEndpoint(EndpointConfig{URL: config.KavaURL})
+
 	return &GUI{
-		grid:            grid,
-		updateParagraph: updateParagraph,
-		draw:            draw,
+		refreshRateSeconds: config.RefreshRateSeconds,
+		debugMode:          config.DebugLoggingEnabled,
+		grid:               grid,
+		updateParagraph:    updateParagraph,
+		draw:               draw,
+		newMessageFunc:     newMessage,
+		kavaEndpoint:       endpoint,
 	}, nil
 }

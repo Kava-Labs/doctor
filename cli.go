@@ -12,7 +12,8 @@ import (
 // used to configure the CLI
 // display mode of the doctor program
 type CLIConfig struct {
-	Logger *log.Logger
+	KavaURL string
+	Logger  *log.Logger
 }
 
 // CLI controls the display
@@ -20,6 +21,7 @@ type CLIConfig struct {
 // using either stdout or file based
 // output devices
 type CLI struct {
+	kavaEndpoint *Endpoint
 	*log.Logger
 }
 
@@ -45,7 +47,10 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 // NewCLI creates and returns a new cli
 // using the provided configuration and error (if any)
 func NewCLI(config CLIConfig) (*CLI, error) {
+	endpoint := NewEndpoint(EndpointConfig{URL: config.KavaURL})
+
 	return &CLI{
-		config.Logger,
+		kavaEndpoint: endpoint,
+		Logger:       config.Logger,
 	}, nil
 }

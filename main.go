@@ -73,7 +73,11 @@ func main() {
 	// setup event handlers for interactive mode
 	if config.InteractiveMode {
 		// create and draw the initial interface
-		guiConfig := GUIConfig{}
+		guiConfig := GUIConfig{
+			DebugLoggingEnabled: config.DebugMode,
+			KavaURL:             config.KavaNodeRPCURL,
+			RefreshRateSeconds:  config.DefaultMonitoringIntervalSeconds,
+		}
 
 		gui, err := NewGUI(guiConfig)
 
@@ -93,7 +97,8 @@ func main() {
 	} else {
 		// setup plaintext or file cli interface
 		cliConfig := CLIConfig{
-			Logger: config.Logger,
+			Logger:  config.Logger,
+			KavaURL: config.KavaNodeRPCURL,
 		}
 
 		cli, err := NewCLI(cliConfig)
