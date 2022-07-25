@@ -49,6 +49,7 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 // SyncStatusMetrics wraps metrics collected
 // by the doctor related to the nodes sync state
 type SyncStatusMetrics struct {
+	NodeId                         string
 	MeasurementLatencyMilliseconds int64
 	SyncStatus                     kava.SyncInfo
 	SecondsBehindLive              int64
@@ -96,6 +97,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			}
 
 			metrics := SyncStatusMetrics{
+				NodeId:                         nodeState.NodeInfo.Id,
 				SyncStatus:                     nodeState.SyncInfo,
 				MeasurementLatencyMilliseconds: endTime.Sub(startTime).Milliseconds(),
 				SecondsBehindLive:              secondsBehindLive,

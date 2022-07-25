@@ -54,14 +54,20 @@ func NewEndpoint(config EndpointConfig) *Endpoint {
 // AddNodeMetrics adds metrics for a node to the collection of
 // metrics for that node, pruning the oldest metrics until only
 // MetricSamplesToKeepPerNode are present
-func (e *Endpoint) AddNodeMetrics(nodeId string, metrics NodeMetrics) {
-	_, exists := e.PerNodeMetrics[nodeId]
+func (e *Endpoint) AddNodeMetrics(nodeId string, newMetrics NodeMetrics) {
+	currentMetrics, exists := e.PerNodeMetrics[nodeId]
 
 	if !exists {
-		e.PerNodeMetrics[nodeId] = []NodeMetrics{metrics}
+		e.PerNodeMetrics[nodeId] = []NodeMetrics{newMetrics}
+		return
 	}
 
-	e.PerNodeMetrics[nodeId] = append(e.PerNodeMetrics[nodeId], metrics)
+	if len(currentMetrics) == e.MetricSamplesToKeepPerNode {
+		// prune the oldest metric
+		e.PerNodeMetrics[nodeId] = currentMetrics[1:]
+	}
+
+	e.PerNodeMetrics[nodeId] = append(e.PerNodeMetrics[nodeId], newMetrics)
 }
 
 // CalculateNodeCatchupSeconds attempts to calculate the number of seconds

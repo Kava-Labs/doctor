@@ -38,6 +38,9 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 			fmt.Printf("%s is synched up to block %d, %d seconds behind live, status check took %d milliseconds\n", kavaNodeRPCURL, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, syncStatusMetrics.MeasurementLatencyMilliseconds)
 			// TODO: check to see if we should log this to a file
 			// TODO: check to see if we should this to cloudwatch
+			c.kavaEndpoint.AddNodeMetrics(syncStatusMetrics.NodeId, NodeMetrics{
+				SyncStatusMetrics: []SyncStatusMetrics{syncStatusMetrics},
+			})
 		case logMessage := <-logMessages:
 			c.Println(logMessage)
 		}

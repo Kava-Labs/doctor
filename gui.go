@@ -60,17 +60,29 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 			switch e.ID {
 			case "q", "<C-c>":
 				ui.Close()
+
 				return nil
 			case "c":
 				updatedParagraph := fmt.Sprintf(
 					`Current Config %+v
 				`, viper.AllSettings())
-				g.draw(tickerCount, updatedParagraph)
+
+				g.newMessageFunc(updatedParagraph)
+
 				time.Sleep(1 * time.Second)
+			case "l":
+				message := fmt.Sprintf("Accumulated Metrics %+v", g.kavaEndpoint)
+
+				g.newMessageFunc(message)
+
+				time.Sleep(3 * time.Second)
 			case "<Resize>":
 				payload := e.Payload.(ui.Resize)
+
 				g.grid.SetRect(0, 0, payload.Width, payload.Height)
+
 				ui.Clear()
+
 				ui.Render(g.grid)
 			}
 		// events triggered by new data
@@ -80,7 +92,12 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 			Seconds Behind Live %d
 			Sync Status Latency (milliseconds) %d
 			`, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, syncStatusMetrics.MeasurementLatencyMilliseconds)
+
 			g.draw(tickerCount, updatedParagraph)
+
+			g.kavaEndpoint.AddNodeMetrics(syncStatusMetrics.NodeId, NodeMetrics{
+				SyncStatusMetrics: []SyncStatusMetrics{syncStatusMetrics},
+			})
 		// events triggered by debug worthy events
 		case logMessage := <-logMessages:
 			// TODO: separate channels
@@ -93,7 +110,9 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 		// events triggered on a regular time based interval
 		case <-ticker:
 			g.updateParagraph(tickerCount)
+
 			g.draw(tickerCount, "")
+
 			tickerCount++
 		}
 	}
@@ -107,7 +126,10 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 	// uppper left box
 	syncMetrics := widgets.NewParagraph()
 	syncMetrics.Title = "Sync Metrics"
-	syncMetrics.Text = "PRESS q TO QUIT DEMO"
+	syncMetrics.Text = `PRESS q TO QUIT
+	PRESS c TO VIEW CONFIG
+	PRESS l TO LIST SAMPLES
+	`
 	syncMetrics.SetRect(0, 0, 50, 5)
 	syncMetrics.TextStyle.Fg = ui.ColorWhite
 	syncMetrics.BorderStyle.Fg = ui.ColorCyan

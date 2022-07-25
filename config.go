@@ -23,6 +23,7 @@ const (
 	ConfigFilepathFlagName                   = "config_filepath"
 	DefaultMonitoringIntervalSecondsFlagName = "default_monitoring_interval_seconds"
 	KavaAPIAddressFlagName                   = "kava_api_address"
+	MaxMetricSamplesToRetainPerNodeFlagName  = "max_metric_samples_to_retain_per_node"
 )
 
 var (
@@ -36,6 +37,7 @@ var (
 	debugModeFlag                        = flag.Bool("debug", false, "controls whether debug logging is enabled")
 	interactiveModeFlag                  = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
 	defaultMonitoringIntervalSecondsFlag = flag.Int(DefaultMonitoringIntervalSecondsFlagName, 5, "Default interval doctor will use for the various monitoring routines")
+	maxMetricSamplesToRetainPerNodeFlag  = flag.Int(MaxMetricSamplesToRetainPerNodeFlagName, 10000, "Maximum number of metric samples that will be kept in memory per node")
 )
 
 // DoctorConfig wraps values used to configure
