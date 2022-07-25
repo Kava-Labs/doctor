@@ -72,8 +72,9 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
 			updatedParagraph := fmt.Sprintf(`
 			Latest Block Height %d
+			Seconds Behind Live %d
 			Sync Status Latency (milliseconds) %d
-			`, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.MeasurementLatencyMilliseconds)
+			`, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, syncStatusMetrics.MeasurementLatencyMilliseconds)
 			g.draw(tickerCount, updatedParagraph)
 		case logMessage := <-logMessages:
 			// TODO: separate channels

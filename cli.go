@@ -33,7 +33,7 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
 			// TODO: log to configured backends (stdout, file and or cloudwatch)
 			// for now log new monitoring data to stdout by default
-			fmt.Printf("%s is synched up to block %d, status check took %d milliseconds\n", kavaNodeRPCURL, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.MeasurementLatencyMilliseconds)
+			fmt.Printf("%s is synched up to block %d, %d seconds behind live, status check took %d milliseconds\n", kavaNodeRPCURL, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, syncStatusMetrics.MeasurementLatencyMilliseconds)
 			// TODO: check to see if we should log this to a file
 			// TODO: check to see if we should this to cloudwatch
 		case logMessage := <-logMessages:

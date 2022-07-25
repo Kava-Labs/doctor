@@ -51,6 +51,7 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 type SyncStatusMetrics struct {
 	MeasurementLatencyMilliseconds int64
 	SyncStatus                     kava.SyncInfo
+	SecondsBehindLive              int64
 }
 
 // WatchSyncStatus watches  (until the context is cancelled)
@@ -83,9 +84,21 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				continue
 			}
 
+			var secondsBehindLive int64
+
+			// only need to calculate secondsBehindLive
+			// if the node isn't caught up, otherwise can
+			// ignore the time diff between when the last block
+			// was created and this measurement was recorded
+			if nodeState.SyncInfo.CatchingUp {
+				currentSyncTime := nodeState.SyncInfo.LatestBlockTime
+				secondsBehindLive = int64(time.Since(currentSyncTime).Seconds())
+			}
+
 			metrics := SyncStatusMetrics{
 				SyncStatus:                     nodeState.SyncInfo,
 				MeasurementLatencyMilliseconds: endTime.Sub(startTime).Milliseconds(),
+				SecondsBehindLive:              secondsBehindLive,
 			}
 
 			go func() {
