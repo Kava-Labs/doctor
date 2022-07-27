@@ -12,8 +12,10 @@ import (
 // used to configure the CLI
 // display mode of the doctor program
 type CLIConfig struct {
-	KavaURL string
-	Logger  *log.Logger
+	KavaURL                                    string
+	MaxMetricSamplesToRetainPerNode            int
+	MetricSamplesForSyntheticMetricCalculation int
+	Logger                                     *log.Logger
 }
 
 // CLI controls the display
@@ -35,11 +37,20 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
 			// TODO: log to configured backends (stdout, file and or cloudwatch)
 			// for now log new monitoring data to stdout by default
-			fmt.Printf("%s is synched up to block %d, %d seconds behind live, status check took %d milliseconds\n", kavaNodeRPCURL, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, syncStatusMetrics.MeasurementLatencyMilliseconds)
+
+			nodeId := syncStatusMetrics.NodeId
+
+			hashRatePerSecond, err := c.kavaEndpoint.CalculateNodeHashRatePerSecond(nodeId)
+			if err != nil {
+				fmt.Printf("error %s calculating hash rate for node %s\n", err, nodeId)
+			}
+
+			fmt.Printf("%s node %s is synched up to block %d, %d seconds behind live, hashing %f blocks per second, status check took %d milliseconds\n", kavaNodeRPCURL, nodeId, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, hashRatePerSecond, syncStatusMetrics.SampleLatencyMilliseconds)
+
 			// TODO: check to see if we should log this to a file
 			// TODO: check to see if we should this to cloudwatch
-			c.kavaEndpoint.AddNodeMetrics(syncStatusMetrics.NodeId, NodeMetrics{
-				SyncStatusMetrics: []SyncStatusMetrics{syncStatusMetrics},
+			c.kavaEndpoint.AddSample(syncStatusMetrics.NodeId, NodeMetrics{
+				SyncStatusMetrics: &syncStatusMetrics,
 			})
 		case logMessage := <-logMessages:
 			c.Println(logMessage)
@@ -50,7 +61,10 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 // NewCLI creates and returns a new cli
 // using the provided configuration and error (if any)
 func NewCLI(config CLIConfig) (*CLI, error) {
-	endpoint := NewEndpoint(EndpointConfig{URL: config.KavaURL})
+	endpoint := NewEndpoint(EndpointConfig{URL: config.KavaURL,
+		MetricSamplesToKeepPerNode:                 config.MaxMetricSamplesToRetainPerNode,
+		MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
+	})
 
 	return &CLI{
 		kavaEndpoint: endpoint,

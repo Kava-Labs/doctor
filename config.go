@@ -20,10 +20,11 @@ const (
 	DoctorConfigEnvironmentVariablePrefix = "DOCTOR"
 	// use snake_casing to match json or
 	// environment variable provided configuration
-	ConfigFilepathFlagName                   = "config_filepath"
-	DefaultMonitoringIntervalSecondsFlagName = "default_monitoring_interval_seconds"
-	KavaAPIAddressFlagName                   = "kava_api_address"
-	MaxMetricSamplesToRetainPerNodeFlagName  = "max_metric_samples_to_retain_per_node"
+	ConfigFilepathFlagName                             = "config_filepath"
+	DefaultMonitoringIntervalSecondsFlagName           = "default_monitoring_interval_seconds"
+	KavaAPIAddressFlagName                             = "kava_api_address"
+	MaxMetricSamplesToRetainPerNodeFlagName            = "max_metric_samples_to_retain_per_node"
+	MetricSamplesForSyntheticMetricCalculationFlagName = "metric_samples_to_use_for_synthetic_metrics"
 )
 
 var (
@@ -32,22 +33,25 @@ var (
 	// parsed from a json file and/or environment variables
 	// specifying these allows setting default values and
 	// auto populates help text in the output of --help
-	configFilepathFlag                   = flag.String(ConfigFilepathFlagName, "~/.kava/doctor/config.json", "filepath to json config file to use for running doctor")
-	kavaAPIAddressFlag                   = flag.String(KavaAPIAddressFlagName, "https://rpc.data.kava.io", "filepath to json config file to use for running doctor")
-	debugModeFlag                        = flag.Bool("debug", false, "controls whether debug logging is enabled")
-	interactiveModeFlag                  = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
-	defaultMonitoringIntervalSecondsFlag = flag.Int(DefaultMonitoringIntervalSecondsFlagName, 5, "Default interval doctor will use for the various monitoring routines")
-	maxMetricSamplesToRetainPerNodeFlag  = flag.Int(MaxMetricSamplesToRetainPerNodeFlagName, 10000, "Maximum number of metric samples that will be kept in memory per node")
+	configFilepathFlag                                 = flag.String(ConfigFilepathFlagName, "~/.kava/doctor/config.json", "filepath to json config file to use for running doctor")
+	kavaAPIAddressFlag                                 = flag.String(KavaAPIAddressFlagName, "https://rpc.data.kava.io", "filepath to json config file to use for running doctor")
+	debugModeFlag                                      = flag.Bool("debug", false, "controls whether debug logging is enabled")
+	interactiveModeFlag                                = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
+	defaultMonitoringIntervalSecondsFlag               = flag.Int(DefaultMonitoringIntervalSecondsFlagName, 5, "Default interval doctor will use for the various monitoring routines")
+	maxMetricSamplesToRetainPerNodeFlag                = flag.Int(MaxMetricSamplesToRetainPerNodeFlagName, DefaultMetricSamplesToKeepPerNode, "Maximum number of metric samples that will be kept in memory per node")
+	metricSamplesForSyntheticMetricCalculationFlagName = flag.Int(MetricSamplesForSyntheticMetricCalculationFlagName, DefaultMetricSamplesForSyntheticMetricCalculation, "number of metric samples to use when calculating synthetic metrics such as the node hash rate")
 )
 
 // DoctorConfig wraps values used to configure
 // the execution of the doctor program
 type DoctorConfig struct {
-	KavaNodeRPCURL                   string
-	InteractiveMode                  bool
-	DebugMode                        bool
-	DefaultMonitoringIntervalSeconds int
-	Logger                           *log.Logger
+	KavaNodeRPCURL                             string
+	InteractiveMode                            bool
+	DebugMode                                  bool
+	DefaultMonitoringIntervalSeconds           int
+	MaxMetricSamplesToRetainPerNode            int
+	MetricSamplesForSyntheticMetricCalculation int
+	Logger                                     *log.Logger
 }
 
 // GetDoctorConfig gets an instance of DoctorConfig
@@ -112,5 +116,7 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 		DefaultMonitoringIntervalSeconds: viper.GetInt(DefaultMonitoringIntervalSecondsFlagName),
 		DebugMode:                        debugMode,
 		Logger:                           logger,
+		MaxMetricSamplesToRetainPerNode:  viper.GetInt(MaxMetricSamplesToRetainPerNodeFlagName),
+		MetricSamplesForSyntheticMetricCalculation: viper.GetInt(MetricSamplesForSyntheticMetricCalculationFlagName),
 	}, nil
 }

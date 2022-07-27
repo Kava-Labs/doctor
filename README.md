@@ -47,8 +47,20 @@ https://rpc.public.us-west.testing.kava.io:443 is synched up to block 498753 @ 1
 
 ### Building
 
+```bash
+make build
+```
+
 ### Running
 
+```bash
+make run
+```
+
 ### Testing
+
+```bash
+make test
+```
 
 ### Publishing

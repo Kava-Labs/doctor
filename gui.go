@@ -18,9 +18,11 @@ import (
 // used to configure the GUI
 // display mode of the doctor program
 type GUIConfig struct {
-	DebugLoggingEnabled bool
-	KavaURL             string
-	RefreshRateSeconds  int
+	DebugLoggingEnabled                        bool
+	KavaURL                                    string
+	RefreshRateSeconds                         int
+	MaxMetricSamplesToRetainPerNode            int
+	MetricSamplesForSyntheticMetricCalculation int
 }
 
 // GUI controls the display
@@ -87,16 +89,26 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 			}
 		// events triggered by new data
 		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
+			nodeId := syncStatusMetrics.NodeId
+
+			hashRatePerSecond, err := g.kavaEndpoint.CalculateNodeHashRatePerSecond(nodeId)
+
+			if err != nil {
+				g.newMessageFunc(fmt.Sprintf("error %s calculating hash rate for node %s\n", err, nodeId))
+			}
+
 			updatedParagraph := fmt.Sprintf(
-				`Latest Block Height %d
+				`Node %s
+			Latest Block Height %d
 			Seconds Behind Live %d
+			Blocks hashed per second %f
 			Sync Status Latency (milliseconds) %d
-			`, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, syncStatusMetrics.MeasurementLatencyMilliseconds)
+			`, nodeId, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, hashRatePerSecond, syncStatusMetrics.SampleLatencyMilliseconds)
 
 			g.draw(tickerCount, updatedParagraph)
 
-			g.kavaEndpoint.AddNodeMetrics(syncStatusMetrics.NodeId, NodeMetrics{
-				SyncStatusMetrics: []SyncStatusMetrics{syncStatusMetrics},
+			g.kavaEndpoint.AddSample(syncStatusMetrics.NodeId, NodeMetrics{
+				SyncStatusMetrics: &syncStatusMetrics,
 			})
 		// events triggered by debug worthy events
 		case logMessage := <-logMessages:
@@ -256,7 +268,10 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 	// show the initial ui to the user
 	ui.Render(grid)
 
-	endpoint := NewEndpoint(EndpointConfig{URL: config.KavaURL})
+	endpoint := NewEndpoint(EndpointConfig{URL: config.KavaURL,
+		MetricSamplesToKeepPerNode:                 config.MaxMetricSamplesToRetainPerNode,
+		MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
+	})
 
 	return &GUI{
 		refreshRateSeconds: config.RefreshRateSeconds,

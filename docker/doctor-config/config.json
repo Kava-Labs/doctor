@@ -2,5 +2,7 @@
     "kava_api_address": "http://localhost:26657",
     "debug": true,
     "interactive": false,
-    "default_monitoring_interval_seconds": 20
+    "default_monitoring_interval_seconds": 5,
+    "max_metric_samples_to_retain_per_node": 10000,
+    "metric_samples_to_use_for_synthetic_metrics": 60
 }
