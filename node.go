@@ -56,9 +56,17 @@ type SyncStatusMetrics struct {
 	SampledAt                 time.Time
 }
 
+// UptimeMetric wraps values used to calculate
+// availability metrics for a given kava endpoint
+type UptimeMetric struct {
+	EndpointURL string
+	Up          bool
+	SampledAt   time.Time
+}
+
 // WatchSyncStatus watches  (until the context is cancelled)
 // the sync status for the node and sends any new data to the provided channel.
-func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics chan<- SyncStatusMetrics, logMessages chan<- string) {
+func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics chan<- SyncStatusMetrics, uptimeMetrics chan<- UptimeMetric, logMessages chan<- string) {
 	// create channel that will emit
 	// an event every DefaultMonitoringIntervalSeconds seconds
 	ticker := time.NewTicker(time.Duration(nc.config.DefaultMonitoringIntervalSeconds) * time.Second).C
@@ -75,11 +83,19 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			nodeState, err := nc.GetNodeState()
 			endTime := time.Now()
 
+			uptimeMetric := UptimeMetric{
+				EndpointURL: nc.config.RPCEndpoint,
+				SampledAt:   startTime,
+				Up:          true,
+			}
+
 			if err != nil {
+				uptimeMetric.Up = false
 				// log error, but don't block the monitoring
 				// routine if the logMessage channel is full
 				go func() {
 					logMessages <- fmt.Sprintf("error %s getting node status", err)
+					uptimeMetrics <- uptimeMetric
 				}()
 
 				// keep watching
@@ -108,6 +124,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			go func() {
 				logMessages <- fmt.Sprintf("node state %+v", nodeState)
 				syncStatusMetrics <- metrics
+				uptimeMetrics <- uptimeMetric
 			}()
 		}
 	}

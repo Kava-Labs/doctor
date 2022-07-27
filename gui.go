@@ -34,6 +34,7 @@ type GUI struct {
 	updateParagraph    func(count int)
 	draw               func(count int, paragraph string)
 	newMessageFunc     func(message string)
+	updateUptimeFunc   func(uptime float32)
 	kavaEndpoint       *Endpoint
 	refreshRateSeconds int
 	debugMode          bool
@@ -87,7 +88,7 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 
 				ui.Render(g.grid)
 			}
-		// events triggered by new data
+		// events triggered by new metric data
 		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
 			nodeId := syncStatusMetrics.NodeId
 
@@ -110,6 +111,22 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 			g.kavaEndpoint.AddSample(syncStatusMetrics.NodeId, NodeMetrics{
 				SyncStatusMetrics: &syncStatusMetrics,
 			})
+		// events triggered by new metric data
+		case uptimeMetric := <-metricReadOnlyChannels.UptimeMetrics:
+			g.kavaEndpoint.AddSample(uptimeMetric.EndpointURL, NodeMetrics{
+				UptimeMetric: &uptimeMetric,
+			})
+
+			// calculate uptime
+			uptime, err := g.kavaEndpoint.CalculateUptime(uptimeMetric.EndpointURL)
+
+			if err != nil {
+				g.newMessageFunc(fmt.Sprintf("error %s calculating uptime for %s\n", err, uptimeMetric.EndpointURL))
+				continue
+			}
+
+			// update uptime gauge
+			g.updateUptimeFunc(uptime)
 		// events triggered by debug worthy events
 		case logMessage := <-logMessages:
 			// TODO: separate channels
@@ -135,7 +152,7 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 		panic(fmt.Errorf("failed to initialize termui: %v", err))
 	}
 
-	// uppper left box
+	// upper left box
 	syncMetrics := widgets.NewParagraph()
 	syncMetrics.Title = "Sync Metrics"
 	syncMetrics.Text = `PRESS q TO QUIT
@@ -163,13 +180,13 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 	messages.BorderStyle.Fg = ui.ColorMagenta
 
 	// lower left box
-	g := widgets.NewGauge()
-	g.Title = "Gauge"
-	g.Percent = 50
-	g.SetRect(0, 12, 50, 15)
-	g.BarColor = ui.ColorRed
-	g.BorderStyle.Fg = ui.ColorWhite
-	g.TitleStyle.Fg = ui.ColorCyan
+	uptimeMetric := widgets.NewGauge()
+	uptimeMetric.Title = "Uptime Metric"
+	uptimeMetric.Percent = 0
+	uptimeMetric.SetRect(0, 12, 50, 15)
+	uptimeMetric.BarColor = ui.ColorRed
+	uptimeMetric.BorderStyle.Fg = ui.ColorWhite
+	uptimeMetric.TitleStyle.Fg = ui.ColorCyan
 
 	sparklineData := []float64{4, 2, 1, 6, 3, 9, 1, 4, 2, 15, 14, 9, 8, 6, 10, 13, 15, 12, 10, 5, 3, 6, 1, 7, 10, 10, 14, 13, 6, 4, 2, 1, 6, 3, 9, 1, 4, 2, 15, 14, 9, 8, 6, 10, 13, 15, 12, 10, 5, 3, 6, 1, 7, 10, 10, 14, 13, 6, 4, 2, 1, 6, 3, 9, 1, 4, 2, 15, 14, 9, 8, 6, 10, 13, 15, 12, 10, 5, 3, 6, 1, 7, 10, 10, 14, 13, 6, 4, 2, 1, 6, 3, 9, 1, 4, 2, 15, 14, 9, 8, 6, 10, 13, 15, 12, 10, 5, 3, 6, 1, 7, 10, 10, 14, 13, 6}
 
@@ -236,7 +253,7 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 			ui.NewCol(1.0/2, messages),
 		),
 		ui.NewRow(1.0/2,
-			ui.NewCol(1.0/4, g),
+			ui.NewCol(1.0/4, uptimeMetric),
 			ui.NewCol(1.0/4,
 				ui.NewRow(.9/3, slg),
 				ui.NewRow(.9/3, lc),
@@ -249,7 +266,6 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 	// setup function to call whenever
 	// there is new data
 	draw := func(count int, paragraph string) {
-		g.Percent = count % 101
 		slg.Sparklines[0].Data = sparklineData[:30+count%50]
 		slg.Sparklines[1].Data = sparklineData[:35+count%50]
 		lc.Data[0] = sinData[count/2%220:]
@@ -260,6 +276,16 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 		}
 		ui.Render(grid)
 	}
+
+	// setup function to call whenever
+	// the uptime metric needs to be updated
+	updateUptime := func(uptime float32) {
+		uptimeMetric.Percent = int(math.Round(float64(uptime) * 100))
+		ui.Render(grid)
+	}
+
+	// setup function to call whenever there
+	// is new debug / log messages to show
 	newMessage := func(message string) {
 		messages.Text = message
 		ui.Render(grid)
@@ -278,6 +304,7 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 		debugMode:          config.DebugLoggingEnabled,
 		grid:               grid,
 		updateParagraph:    updateParagraph,
+		updateUptimeFunc:   updateUptime,
 		draw:               draw,
 		newMessageFunc:     newMessage,
 		kavaEndpoint:       endpoint,

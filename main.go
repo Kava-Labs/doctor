@@ -20,6 +20,7 @@ var (
 // related to the health of a kava node
 type MetricReadOnlyChannels struct {
 	SyncStatusMetrics <-chan SyncStatusMetrics
+	UptimeMetrics     <-chan UptimeMetric
 }
 
 func main() {
@@ -32,11 +33,13 @@ func main() {
 	// node sync status to metric collection and display
 	// endpoints
 	syncStatusMetrics := make(chan SyncStatusMetrics)
+	uptimeMetrics := make(chan UptimeMetric)
 
 	// collect all metric channels together for the
 	// gui or cli functions to watch and display
 	metricReadOnlyChannels := MetricReadOnlyChannels{
 		SyncStatusMetrics: syncStatusMetrics,
+		UptimeMetrics:     uptimeMetrics,
 	}
 
 	// parse desired configuration
@@ -68,7 +71,7 @@ func main() {
 
 	// watch the node's sync status endpoint
 	// to measure it's block syncing performance
-	go nodeClient.WatchSyncStatus(ctx, syncStatusMetrics, logMessages)
+	go nodeClient.WatchSyncStatus(ctx, syncStatusMetrics, uptimeMetrics, logMessages)
 
 	// setup event handlers for interactive mode
 	if config.InteractiveMode {

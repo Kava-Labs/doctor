@@ -18,6 +18,7 @@ var (
 // metric samples for a single node
 type NodeMetrics struct {
 	SyncStatusMetrics *SyncStatusMetrics
+	UptimeMetric      *UptimeMetric
 }
 
 // Represents a collection of one or more distinct
@@ -143,4 +144,53 @@ func (e *Endpoint) CalculateNodeHashRatePerSecond(nodeId string) (float32, error
 	// subtract 1 for the average because we are always
 	// taking the delta between at least two samples
 	return sumBlockRates / float32(numSamples-1), nil
+}
+
+// CalculateUptime attempts to calculate the overall availability
+// for a given endpoint (which may be backed by multiple nodes)
+// if no metrics (of any kind) for the endpoint exists,
+// `ErrNodeMetricsNotFound` is returned
+// if less than one uptime metrics exist for the node,
+// `ErrInsufficientMetricSamples` is returned
+func (e *Endpoint) CalculateUptime(endpointURL string) (float32, error) {
+	metricSamples, exists := e.PerNodeMetrics[endpointURL]
+
+	if !exists {
+		return 0, ErrNodeMetricsNotFound
+	}
+
+	var numSamples int
+	var samples []*UptimeMetric
+
+	for _, metricSample := range metricSamples {
+		// only use up to DefaultMetricSamplesForSyntheticMetricCalculation
+		if numSamples == e.MetricSamplesForSyntheticMetricCalculation {
+			break
+		}
+		//  need UptimeMetric to uptime
+		if metricSample.UptimeMetric == nil {
+			continue
+		}
+
+		samples = append(samples, metricSample.UptimeMetric)
+
+		numSamples++
+	}
+
+	// need at least one samples to calculate uptime
+	if numSamples == 0 {
+		return 0, ErrInsufficientMetricSamples
+	}
+
+	// count the total number of times the endpoint
+	// was "up"
+	var availabilityPeriods float32
+
+	for _, sample := range samples {
+		if sample.Up {
+			availabilityPeriods += 1
+		}
+	}
+
+	return availabilityPeriods / float32(numSamples), nil
 }

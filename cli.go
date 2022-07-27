@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 )
 
 // CLIConfig wraps values
@@ -42,7 +43,7 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 
 			hashRatePerSecond, err := c.kavaEndpoint.CalculateNodeHashRatePerSecond(nodeId)
 			if err != nil {
-				fmt.Printf("error %s calculating hash rate for node %s\n", err, nodeId)
+				c.Printf("error %s calculating hash rate for node %s\n", err, nodeId)
 			}
 
 			fmt.Printf("%s node %s is synched up to block %d, %d seconds behind live, hashing %f blocks per second, status check took %d milliseconds\n", kavaNodeRPCURL, nodeId, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, hashRatePerSecond, syncStatusMetrics.SampleLatencyMilliseconds)
@@ -52,6 +53,20 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 			c.kavaEndpoint.AddSample(syncStatusMetrics.NodeId, NodeMetrics{
 				SyncStatusMetrics: &syncStatusMetrics,
 			})
+		case uptimeMetric := <-metricReadOnlyChannels.UptimeMetrics:
+			c.kavaEndpoint.AddSample(uptimeMetric.EndpointURL, NodeMetrics{
+				UptimeMetric: &uptimeMetric,
+			})
+
+			// calculate uptime
+			uptime, err := c.kavaEndpoint.CalculateUptime(uptimeMetric.EndpointURL)
+
+			if err != nil {
+				c.Printf(fmt.Sprintf("error %s calculating uptime for %s\n", err, uptimeMetric.EndpointURL))
+				continue
+			}
+
+			fmt.Printf("%s uptime %d%% \n", uptimeMetric.EndpointURL, int(math.Round(float64(uptime)*100)))
 		case logMessage := <-logMessages:
 			c.Println(logMessage)
 		}

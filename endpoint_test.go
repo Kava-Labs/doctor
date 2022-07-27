@@ -229,6 +229,63 @@ func TestCalculateNodeHashRateCalculatesHashRateBasedOnSamples(t *testing.T) {
 	assert.Equal(t, float32(4.0), hashRatePerSecond)
 }
 
+func TestCalculateUptimeReturnsErrWhenNoSamplesForNode(t *testing.T) {
+	endpoint := createEndpoint()
+
+	endpointURL := uuid.New().String()
+
+	_, err := endpoint.CalculateUptime(endpointURL)
+
+	assert.NotNil(t, err)
+
+	assert.EqualError(t, err, ErrNodeMetricsNotFound.Error())
+}
+
+func TestCalculateUptimeReturnsErrWhenNoUptimeSamplesForNode(t *testing.T) {
+	endpoint := createEndpoint()
+
+	endpointURL := uuid.New().String()
+
+	sample1 := NodeMetrics{
+		SyncStatusMetrics: &SyncStatusMetrics{},
+	}
+
+	endpoint.AddSample(endpointURL, sample1)
+
+	_, err := endpoint.CalculateUptime(endpointURL)
+
+	assert.NotNil(t, err)
+
+	assert.EqualError(t, err, ErrInsufficientMetricSamples.Error())
+}
+
+func TestCalculateUptimeCalculatesUptimeBasedOnSamples(t *testing.T) {
+	endpoint := createEndpoint()
+
+	endpointURL := uuid.New().String()
+
+	sample1 := NodeMetrics{
+		UptimeMetric: &UptimeMetric{
+			Up: true,
+		},
+	}
+
+	sample2 := NodeMetrics{
+		UptimeMetric: &UptimeMetric{
+			Up: false,
+		},
+	}
+
+	endpoint.AddSample(endpointURL, sample1)
+	endpoint.AddSample(endpointURL, sample2)
+
+	uptime, err := endpoint.CalculateUptime(endpointURL)
+
+	assert.Nil(t, err)
+
+	assert.Equal(t, float32(0.5), uptime)
+}
+
 func createEndpoint() *Endpoint {
 	return NewEndpoint(EndpointConfig{URL: DefaultTestKavaURL})
 }
