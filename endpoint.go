@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+
+	"github.com/kava-labs/doctor/metric"
 )
 
 const (
@@ -17,8 +19,8 @@ var (
 // NodeMetrics wrap a collection of
 // metric samples for a single node
 type NodeMetrics struct {
-	SyncStatusMetrics *SyncStatusMetrics
-	UptimeMetric      *UptimeMetric
+	SyncStatusMetrics *metric.SyncStatusMetrics
+	UptimeMetric      *metric.UptimeMetric
 }
 
 // Represents a collection of one or more distinct
@@ -84,7 +86,11 @@ func (e *Endpoint) AddSample(nodeId string, newMetrics NodeMetrics) {
 }
 
 // returns up to the most recent metrics that match the given predicate
-// see reverseNodeMetrics comment for optimization ideas
+// TODO: probably not going to ever hit a scaling issue, but would be more efficient
+// to have AddSample store up to MetricSamplesForSyntheticMetricCalculation
+// per metric type in a separate data structure to avoid having to iterate
+// through ALL metrics for each synthetic metric calculation
+// see reverseNodeMetrics comment for other optimization ideas
 func takeUpToNMostRecentMetrics(metrics *[]NodeMetrics, take int, predicate func(*NodeMetrics) bool) *[]NodeMetrics {
 	var takenMetrics []NodeMetrics
 	var taken int

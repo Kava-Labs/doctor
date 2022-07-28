@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/kava-labs/doctor/metric"
 )
 
 var (
@@ -19,8 +21,8 @@ var (
 // that need to display and collect metrics
 // related to the health of a kava node
 type MetricReadOnlyChannels struct {
-	SyncStatusMetrics <-chan SyncStatusMetrics
-	UptimeMetrics     <-chan UptimeMetric
+	SyncStatusMetrics <-chan metric.SyncStatusMetrics
+	UptimeMetrics     <-chan metric.UptimeMetric
 }
 
 func main() {
@@ -32,8 +34,8 @@ func main() {
 	// set up channel for sending updated
 	// node sync status to metric collection and display
 	// endpoints
-	syncStatusMetrics := make(chan SyncStatusMetrics)
-	uptimeMetrics := make(chan UptimeMetric)
+	syncStatusMetrics := make(chan metric.SyncStatusMetrics)
+	uptimeMetrics := make(chan metric.UptimeMetric)
 
 	// collect all metric channels together for the
 	// gui or cli functions to watch and display
@@ -82,6 +84,7 @@ func main() {
 			RefreshRateSeconds:              config.DefaultMonitoringIntervalSeconds,
 			MaxMetricSamplesToRetainPerNode: config.MaxMetricSamplesToRetainPerNode,
 			MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
+			MetricCollectors: config.MetricCollectors,
 		}
 
 		gui, err := NewGUI(guiConfig)
@@ -106,6 +109,7 @@ func main() {
 			KavaURL:                         config.KavaNodeRPCURL,
 			MaxMetricSamplesToRetainPerNode: config.MaxMetricSamplesToRetainPerNode,
 			MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
+			MetricCollectors: config.MetricCollectors,
 		}
 
 		cli, err := NewCLI(cliConfig)

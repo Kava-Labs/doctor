@@ -16,3 +16,9 @@
 
 # VisualStudio Code local configuration
 .vscode
+
+# doctor collected metrics
+*-doctor-metrics.json
+
+# macOS filesystem metadata
+**/.DS_STORE

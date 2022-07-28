@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kava-labs/doctor/clients/kava"
+	"github.com/kava-labs/doctor/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +21,7 @@ func TestAddSampleForNodeWithNoPreviousSamples(t *testing.T) {
 	nodeId := uuid.New().String()
 
 	endpoint.AddSample(nodeId, NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId: nodeId,
 		},
 	})
@@ -40,14 +41,14 @@ func TestAddSampleForNodeWithPreviousSamplesInOrder(t *testing.T) {
 	nodeId := uuid.New().String()
 
 	sample1 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId,
 			SecondsBehindLive: 1,
 		},
 	}
 
 	sample2 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId,
 			SecondsBehindLive: 0,
 		},
@@ -76,14 +77,14 @@ func TestAddSamplePrunesOldestSample(t *testing.T) {
 	nodeId := uuid.New().String()
 
 	sample1 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId,
 			SecondsBehindLive: 1,
 		},
 	}
 
 	sample2 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId,
 			SecondsBehindLive: 0,
 		},
@@ -106,14 +107,14 @@ func TestAddSampleAggregatesSamplesByNodeId(t *testing.T) {
 	nodeId2 := uuid.New().String()
 
 	sample1 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId1,
 			SecondsBehindLive: 1,
 		},
 	}
 
 	sample2 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId2,
 			SecondsBehindLive: 0,
 		},
@@ -153,7 +154,7 @@ func TestCalculateNodeHashRateReturnsErrWhenOnlyOneSamplesForNode(t *testing.T) 
 	nodeId := uuid.New().String()
 
 	endpoint.AddSample(nodeId, NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId: nodeId,
 		},
 	})
@@ -174,7 +175,7 @@ func TestCalculateNodeHashRateCalculatesHashRateBasedOnSamples(t *testing.T) {
 	now := time.Now()
 
 	sample1 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId,
 			SecondsBehindLive: 1,
 			SampledAt:         now,
@@ -185,7 +186,7 @@ func TestCalculateNodeHashRateCalculatesHashRateBasedOnSamples(t *testing.T) {
 	}
 
 	sample2 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId,
 			SecondsBehindLive: 1,
 			SampledAt:         now.Add(1 * time.Second),
@@ -196,7 +197,7 @@ func TestCalculateNodeHashRateCalculatesHashRateBasedOnSamples(t *testing.T) {
 	}
 
 	sample3 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId,
 			SecondsBehindLive: 1,
 			SampledAt:         now.Add(2 * time.Second),
@@ -207,7 +208,7 @@ func TestCalculateNodeHashRateCalculatesHashRateBasedOnSamples(t *testing.T) {
 	}
 
 	sample4 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{
+		SyncStatusMetrics: &metric.SyncStatusMetrics{
 			NodeId:            nodeId,
 			SecondsBehindLive: 1,
 			SampledAt:         now.Add(3 * time.Second),
@@ -247,7 +248,7 @@ func TestCalculateUptimeReturnsErrWhenNoUptimeSamplesForNode(t *testing.T) {
 	endpointURL := uuid.New().String()
 
 	sample1 := NodeMetrics{
-		SyncStatusMetrics: &SyncStatusMetrics{},
+		SyncStatusMetrics: &metric.SyncStatusMetrics{},
 	}
 
 	endpoint.AddSample(endpointURL, sample1)
@@ -265,13 +266,13 @@ func TestCalculateUptimeCalculatesUptimeBasedOnSamples(t *testing.T) {
 	endpointURL := uuid.New().String()
 
 	sample1 := NodeMetrics{
-		UptimeMetric: &UptimeMetric{
+		UptimeMetric: &metric.UptimeMetric{
 			Up: true,
 		},
 	}
 
 	sample2 := NodeMetrics{
-		UptimeMetric: &UptimeMetric{
+		UptimeMetric: &metric.UptimeMetric{
 			Up: false,
 		},
 	}

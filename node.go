@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kava-labs/doctor/clients/kava"
+	"github.com/kava-labs/doctor/metric"
 )
 
 // NodeClientConfig wraps config
@@ -46,27 +47,9 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 	}, nil
 }
 
-// SyncStatusMetrics wraps metrics collected
-// by the doctor related to the nodes sync state
-type SyncStatusMetrics struct {
-	NodeId                    string
-	SampleLatencyMilliseconds int64
-	SyncStatus                kava.SyncInfo
-	SecondsBehindLive         int64
-	SampledAt                 time.Time
-}
-
-// UptimeMetric wraps values used to calculate
-// availability metrics for a given kava endpoint
-type UptimeMetric struct {
-	EndpointURL string
-	Up          bool
-	SampledAt   time.Time
-}
-
 // WatchSyncStatus watches  (until the context is cancelled)
 // the sync status for the node and sends any new data to the provided channel.
-func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics chan<- SyncStatusMetrics, uptimeMetrics chan<- UptimeMetric, logMessages chan<- string) {
+func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics chan<- metric.SyncStatusMetrics, uptimeMetrics chan<- metric.UptimeMetric, logMessages chan<- string) {
 	// create channel that will emit
 	// an event every DefaultMonitoringIntervalSeconds seconds
 	ticker := time.NewTicker(time.Duration(nc.config.DefaultMonitoringIntervalSeconds) * time.Second).C
@@ -83,7 +66,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			nodeState, err := nc.GetNodeState()
 			endTime := time.Now()
 
-			uptimeMetric := UptimeMetric{
+			uptimeMetric := metric.UptimeMetric{
 				EndpointURL: nc.config.RPCEndpoint,
 				SampledAt:   startTime,
 				Up:          true,
@@ -113,7 +96,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				secondsBehindLive = int64(time.Since(currentSyncTime).Seconds())
 			}
 
-			metrics := SyncStatusMetrics{
+			metrics := metric.SyncStatusMetrics{
 				SampledAt:                 startTime,
 				NodeId:                    nodeState.NodeInfo.Id,
 				SyncStatus:                nodeState.SyncInfo,

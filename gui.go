@@ -11,6 +11,8 @@ import (
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
+	"github.com/kava-labs/doctor/collect"
+	"github.com/kava-labs/doctor/metric"
 	"github.com/spf13/viper"
 )
 
@@ -37,6 +39,7 @@ type GUI struct {
 	newMessageFunc     func(message string)
 	updateUptimeFunc   func(uptime float32)
 	kavaEndpoint       *Endpoint
+	metricCollectors   []collect.Collector
 	refreshRateSeconds int
 	debugMode          bool
 	*log.Logger
@@ -92,6 +95,12 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 			}
 		// events triggered by new metric data
 		case syncStatusMetrics := <-metricReadOnlyChannels.SyncStatusMetrics:
+			// record sample in-memory for use in synthetic metric calculation
+			g.kavaEndpoint.AddSample(syncStatusMetrics.NodeId, NodeMetrics{
+				SyncStatusMetrics: &syncStatusMetrics,
+			})
+
+			// calculate hash rate for this node
 			nodeId := syncStatusMetrics.NodeId
 
 			hashRatePerSecond, err := g.kavaEndpoint.CalculateNodeHashRatePerSecond(nodeId)
@@ -110,11 +119,47 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 
 			g.draw(tickerCount, updatedParagraph)
 
-			g.kavaEndpoint.AddSample(syncStatusMetrics.NodeId, NodeMetrics{
-				SyncStatusMetrics: &syncStatusMetrics,
-			})
+			// collect metrics to external storage backends
+			var metrics []metric.Metric
+
+			hashRateMetric := metric.Metric{
+				Name: "BlocksHashedPerSecond",
+				Dimensions: map[string]string{
+					"node_id": nodeId,
+				},
+				Data: metric.HashRateMetric{
+					NodeId:          nodeId,
+					BlocksPerSecond: hashRatePerSecond,
+				},
+			}
+
+			metrics = append(metrics, hashRateMetric)
+
+			syncStatusMetric := metric.Metric{
+				Name: "SyncStatus",
+				Dimensions: map[string]string{
+					"node_id": nodeId,
+				},
+				Data: syncStatusMetrics,
+			}
+
+			metrics = append(metrics, syncStatusMetric)
+
+			for _, collector := range g.metricCollectors {
+				for _, metric := range metrics {
+					err := collector.Collect(metric)
+
+					if err != nil {
+						g.newMessageFunc(fmt.Sprintf("error %s collecting metric %+v\n", err, metric))
+					}
+				}
+
+			}
+
 		// events triggered by new metric data
 		case uptimeMetric := <-metricReadOnlyChannels.UptimeMetrics:
+			endpointURL := uptimeMetric.EndpointURL
+			// record sample in-memory for use in synthetic metric calculation
 			g.kavaEndpoint.AddSample(uptimeMetric.EndpointURL, NodeMetrics{
 				UptimeMetric: &uptimeMetric,
 			})
@@ -129,6 +174,31 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 
 			// update uptime gauge
 			g.updateUptimeFunc(uptime)
+
+			// collect metrics to external storage backends
+			var metrics []metric.Metric
+
+			uptimeMetric.RollingAveragePercentAvailable = uptime * 100
+			uptimeMetricForCollection := metric.Metric{
+				Name: "Uptime",
+				Dimensions: map[string]string{
+					"endpoint_url": endpointURL,
+				},
+				Data: uptimeMetric,
+			}
+
+			metrics = append(metrics, uptimeMetricForCollection)
+
+			for _, collector := range g.metricCollectors {
+				for _, metric := range metrics {
+					err := collector.Collect(metric)
+
+					if err != nil {
+						g.newMessageFunc(fmt.Sprintf("error %s collecting metric %+v\n", err, metric))
+					}
+				}
+
+			}
 		// events triggered by debug worthy events
 		case logMessage := <-logMessages:
 			// TODO: separate channels
@@ -301,6 +371,21 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 		MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
 	})
 
+	collectors := []collect.Collector{}
+
+	for _, collector := range config.MetricCollectors {
+		switch collector {
+		case FileMetricCollector:
+			fileCollector, err := collect.NewFileCollector(collect.FileCollectorConfig{})
+
+			if err != nil {
+				return nil, err
+			}
+
+			collectors = append(collectors, fileCollector)
+		}
+	}
+
 	return &GUI{
 		refreshRateSeconds: config.RefreshRateSeconds,
 		debugMode:          config.DebugLoggingEnabled,
@@ -310,5 +395,6 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 		draw:               draw,
 		newMessageFunc:     newMessage,
 		kavaEndpoint:       endpoint,
+		metricCollectors:   collectors,
 	}, nil
 }
