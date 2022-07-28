@@ -280,7 +280,7 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 	// setup function to call whenever
 	// the uptime metric needs to be updated
 	updateUptime := func(uptime float32) {
-		uptimeMetric.Percent = int(math.Round(float64(uptime) * 100))
+		uptimeMetric.Percent = int(math.Round(float64(uptime * 100)))
 		ui.Render(grid)
 	}
 

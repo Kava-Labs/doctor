@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
 )
 
 // CLIConfig wraps values
@@ -66,7 +65,7 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				continue
 			}
 
-			fmt.Printf("%s uptime %d%% \n", uptimeMetric.EndpointURL, int(math.Round(float64(uptime)*100)))
+			fmt.Printf("%s uptime %f%% \n", uptimeMetric.EndpointURL, uptime*100)
 		case logMessage := <-logMessages:
 			c.Println(logMessage)
 		}

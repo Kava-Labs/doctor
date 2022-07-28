@@ -77,9 +77,11 @@ func main() {
 	if config.InteractiveMode {
 		// create and draw the initial interface
 		guiConfig := GUIConfig{
-			DebugLoggingEnabled: config.DebugMode,
-			KavaURL:             config.KavaNodeRPCURL,
-			RefreshRateSeconds:  config.DefaultMonitoringIntervalSeconds,
+			DebugLoggingEnabled:             config.DebugMode,
+			KavaURL:                         config.KavaNodeRPCURL,
+			RefreshRateSeconds:              config.DefaultMonitoringIntervalSeconds,
+			MaxMetricSamplesToRetainPerNode: config.MaxMetricSamplesToRetainPerNode,
+			MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
 		}
 
 		gui, err := NewGUI(guiConfig)
@@ -100,8 +102,10 @@ func main() {
 	} else {
 		// setup plaintext or file cli interface
 		cliConfig := CLIConfig{
-			Logger:  config.Logger,
-			KavaURL: config.KavaNodeRPCURL,
+			Logger:                          config.Logger,
+			KavaURL:                         config.KavaNodeRPCURL,
+			MaxMetricSamplesToRetainPerNode: config.MaxMetricSamplesToRetainPerNode,
+			MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
 		}
 
 		cli, err := NewCLI(cliConfig)

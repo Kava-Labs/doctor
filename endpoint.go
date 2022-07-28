@@ -83,6 +83,46 @@ func (e *Endpoint) AddSample(nodeId string, newMetrics NodeMetrics) {
 	e.PerNodeMetrics[nodeId] = append(e.PerNodeMetrics[nodeId], newMetrics)
 }
 
+// returns up to the most recent metrics that match the given predicate
+// see reverseNodeMetrics comment for optimization ideas
+func takeUpToNMostRecentMetrics(metrics *[]NodeMetrics, take int, predicate func(*NodeMetrics) bool) *[]NodeMetrics {
+	var takenMetrics []NodeMetrics
+	var taken int
+	newestToOldestMetrics := reverseNodeMetrics(metrics)
+
+	for _, metric := range *newestToOldestMetrics {
+		if taken == take {
+			break
+		}
+
+		if predicate(&metric) {
+			takenMetrics = append(takenMetrics, metric)
+			taken++
+		}
+	}
+
+	return &takenMetrics
+}
+
+// memory optimized but naive implementation
+// TODO: only reverse in chunks, e.g. take the 100 most recent
+// metrics and look for matches, if less matches found than desired
+// take the next 100
+// can speed up performance using goroutines as well
+// https://golangprojectstructure.com/reversing-go-slice-array/
+func reverseNodeMetrics(input *[]NodeMetrics) *[]NodeMetrics {
+	inputLen := len(*input)
+	output := make([]NodeMetrics, inputLen)
+
+	for i, n := range *input {
+		j := inputLen - i - 1
+
+		output[j] = n
+	}
+
+	return &output
+}
+
 // CalculateNodeHashRatePerSecond attempts to calculate the average number of blocks
 // hashed per second by the specified node based on the most recent
 // (up to DefaultMetricSamplesForSyntheticMetricCalculation) samples
@@ -97,23 +137,17 @@ func (e *Endpoint) CalculateNodeHashRatePerSecond(nodeId string) (float32, error
 		return 0, ErrNodeMetricsNotFound
 	}
 
-	var numSamples int
-	var samples []*SyncStatusMetrics
-
-	for _, metricSample := range metricSamples {
-		// only use up to DefaultMetricSamplesForSyntheticMetricCalculation
-		if numSamples == e.MetricSamplesForSyntheticMetricCalculation {
-			break
+	syncStatusMetricMatcher := func(metric *NodeMetrics) bool {
+		var match bool
+		if metric.SyncStatusMetrics != nil {
+			match = true
 		}
-		//  need SyncStatusMetrics to calculate hash rate
-		if metricSample.SyncStatusMetrics == nil {
-			continue
-		}
-
-		samples = append(samples, metricSample.SyncStatusMetrics)
-
-		numSamples++
+		return match
 	}
+
+	samples := takeUpToNMostRecentMetrics(&metricSamples, e.MetricSamplesForSyntheticMetricCalculation, syncStatusMetricMatcher)
+
+	numSamples := len(*samples)
 
 	// need at least two samples to calculate hash rate
 	if numSamples <= 1 {
@@ -122,23 +156,23 @@ func (e *Endpoint) CalculateNodeHashRatePerSecond(nodeId string) (float32, error
 
 	// calculate running average for hash rate
 	var sumBlockRates float32
-	startingBlockHeight := samples[0].SyncStatus.LatestBlockHeight
-	startingBlockTime := samples[0].SampledAt
+	startingBlockHeight := (*samples)[0].SyncStatusMetrics.SyncStatus.LatestBlockHeight
+	startingBlockTime := (*samples)[0].SyncStatusMetrics.SampledAt
 
 	// remove the first sample so it isn't double counted
-	samples = samples[1:]
+	*samples = (*samples)[1:]
 
-	for _, sample := range samples {
+	for _, sample := range *samples {
 		// calculate how many blocks were hashed in between the two samples
-		newBlocks := sample.SyncStatus.LatestBlockHeight - startingBlockHeight
-		secondsBetweenSamples := sample.SampledAt.Sub(startingBlockTime).Seconds()
+		newBlocks := sample.SyncStatusMetrics.SyncStatus.LatestBlockHeight - startingBlockHeight
+		secondsBetweenSamples := sample.SyncStatusMetrics.SampledAt.Sub(startingBlockTime).Seconds()
 
 		blockRate := float32(newBlocks) / float32(secondsBetweenSamples)
 		sumBlockRates += float32(blockRate)
 
 		// update iteration values for next loop
-		startingBlockHeight = sample.SyncStatus.LatestBlockHeight
-		startingBlockTime = sample.SampledAt
+		startingBlockHeight = sample.SyncStatusMetrics.SyncStatus.LatestBlockHeight
+		startingBlockTime = sample.SyncStatusMetrics.SampledAt
 	}
 
 	// subtract 1 for the average because we are always
@@ -159,23 +193,17 @@ func (e *Endpoint) CalculateUptime(endpointURL string) (float32, error) {
 		return 0, ErrNodeMetricsNotFound
 	}
 
-	var numSamples int
-	var samples []*UptimeMetric
-
-	for _, metricSample := range metricSamples {
-		// only use up to DefaultMetricSamplesForSyntheticMetricCalculation
-		if numSamples == e.MetricSamplesForSyntheticMetricCalculation {
-			break
+	uptimeMetricMatcher := func(metric *NodeMetrics) bool {
+		var match bool
+		if metric.UptimeMetric != nil {
+			match = true
 		}
-		//  need UptimeMetric to uptime
-		if metricSample.UptimeMetric == nil {
-			continue
-		}
-
-		samples = append(samples, metricSample.UptimeMetric)
-
-		numSamples++
+		return match
 	}
+
+	samples := takeUpToNMostRecentMetrics(&metricSamples, e.MetricSamplesForSyntheticMetricCalculation, uptimeMetricMatcher)
+
+	numSamples := len(*samples)
 
 	// need at least one samples to calculate uptime
 	if numSamples == 0 {
@@ -186,8 +214,8 @@ func (e *Endpoint) CalculateUptime(endpointURL string) (float32, error) {
 	// was "up"
 	var availabilityPeriods float32
 
-	for _, sample := range samples {
-		if sample.Up {
+	for _, sample := range *samples {
+		if sample.UptimeMetric.Up {
 			availabilityPeriods += 1
 		}
 	}
