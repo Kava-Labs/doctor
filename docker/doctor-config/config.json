@@ -4,5 +4,6 @@
     "interactive": false,
     "default_monitoring_interval_seconds": 5,
     "max_metric_samples_to_retain_per_node": 10000,
-    "metric_samples_to_use_for_synthetic_metrics": 60
+    "metric_samples_to_use_for_synthetic_metrics": 60,
+    "metric_collectors": "file"
 }

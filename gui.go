@@ -23,6 +23,7 @@ type GUIConfig struct {
 	RefreshRateSeconds                         int
 	MaxMetricSamplesToRetainPerNode            int
 	MetricSamplesForSyntheticMetricCalculation int
+	MetricCollectors                           []string
 }
 
 // GUI controls the display
@@ -74,7 +75,8 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 
 				time.Sleep(1 * time.Second)
 			case "l":
-				message := fmt.Sprintf("Accumulated Metrics %+v", g.kavaEndpoint)
+				// TODO: allow paging through metrics per node
+				message := fmt.Sprintf("Accumulated Metrics %+v", g.kavaEndpoint.PerNodeMetrics)
 
 				g.newMessageFunc(message)
 

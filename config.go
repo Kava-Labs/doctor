@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/pflag"
@@ -25,21 +26,30 @@ const (
 	KavaAPIAddressFlagName                             = "kava_api_address"
 	MaxMetricSamplesToRetainPerNodeFlagName            = "max_metric_samples_to_retain_per_node"
 	MetricSamplesForSyntheticMetricCalculationFlagName = "metric_samples_to_use_for_synthetic_metrics"
+	MetricCollectorsFlagName                           = "metric_collectors"
+	DefaultMetricCollector                             = "file"
+	FileMetricCollector                                = "file"
+	CloudwatchMetricCollector                          = "cloudwatch"
 )
 
 var (
+	ValidMetricCollectors = []string{
+		FileMetricCollector,
+		CloudwatchMetricCollector,
+	}
 	// cli flags
 	// while the majority of time configuration values will be
 	// parsed from a json file and/or environment variables
 	// specifying these allows setting default values and
 	// auto populates help text in the output of --help
-	configFilepathFlag                                 = flag.String(ConfigFilepathFlagName, "~/.kava/doctor/config.json", "filepath to json config file to use for running doctor")
-	kavaAPIAddressFlag                                 = flag.String(KavaAPIAddressFlagName, "https://rpc.data.kava.io", "filepath to json config file to use for running doctor")
-	debugModeFlag                                      = flag.Bool("debug", false, "controls whether debug logging is enabled")
-	interactiveModeFlag                                = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
-	defaultMonitoringIntervalSecondsFlag               = flag.Int(DefaultMonitoringIntervalSecondsFlagName, 5, "Default interval doctor will use for the various monitoring routines")
-	maxMetricSamplesToRetainPerNodeFlag                = flag.Int(MaxMetricSamplesToRetainPerNodeFlagName, DefaultMetricSamplesToKeepPerNode, "Maximum number of metric samples that will be kept in memory per node")
-	metricSamplesForSyntheticMetricCalculationFlagName = flag.Int(MetricSamplesForSyntheticMetricCalculationFlagName, DefaultMetricSamplesForSyntheticMetricCalculation, "number of metric samples to use when calculating synthetic metrics such as the node hash rate")
+	configFilepathFlag                             = flag.String(ConfigFilepathFlagName, "~/.kava/doctor/config.json", "filepath to json config file to use")
+	kavaAPIAddressFlag                             = flag.String(KavaAPIAddressFlagName, "https://rpc.data.kava.io", "URL of the endpoint that doctor should monitor")
+	debugModeFlag                                  = flag.Bool("debug", false, "controls whether debug logging is enabled")
+	interactiveModeFlag                            = flag.Bool("interactive", false, "controls whether an interactive terminal UI is displayed")
+	defaultMonitoringIntervalSecondsFlag           = flag.Int(DefaultMonitoringIntervalSecondsFlagName, 5, "default interval doctor will use for the various monitoring routines")
+	maxMetricSamplesToRetainPerNodeFlag            = flag.Int(MaxMetricSamplesToRetainPerNodeFlagName, DefaultMetricSamplesToKeepPerNode, "maximum number of metric samples that will be kept in memory per node")
+	metricSamplesForSyntheticMetricCalculationFlag = flag.Int(MetricSamplesForSyntheticMetricCalculationFlagName, DefaultMetricSamplesForSyntheticMetricCalculation, "number of metric samples to use when calculating synthetic metrics such as the node hash rate")
+	metricCollectorsFlag                           = flag.String(MetricCollectorsFlagName, DefaultMetricCollector, fmt.Sprintf("where to send collected metrics to, multiple collectors can be specified as a comma separated list, supported collectors are %v", ValidMetricCollectors))
 )
 
 // DoctorConfig wraps values used to configure
@@ -51,6 +61,7 @@ type DoctorConfig struct {
 	DefaultMonitoringIntervalSeconds           int
 	MaxMetricSamplesToRetainPerNode            int
 	MetricSamplesForSyntheticMetricCalculation int
+	MetricCollectors                           []string
 	Logger                                     *log.Logger
 }
 
@@ -108,7 +119,30 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 
 	// there may be more configuration values provided
 	// then were parsed above
-	logger.Printf("doctor raw config %+v", viper.AllSettings())
+	logger.Printf("doctor raw config %+v\n", viper.AllSettings())
+
+	// validate requested metric collectors
+	// need to manually parse string slice because
+	// https://github.com/spf13/viper/issues/380
+	requestedCollectors := strings.Split(viper.GetString(MetricCollectorsFlagName), ",")
+	validCollectors := []string{}
+
+	for _, requestedCollector := range requestedCollectors {
+		for _, validCollector := range ValidMetricCollectors {
+			if requestedCollector == validCollector {
+				validCollectors = append(validCollectors, requestedCollector)
+
+				break
+			}
+		}
+	}
+
+	// if no valid collector specified default to "file"
+	if len(validCollectors) == 0 {
+		logger.Printf("no valid collectors %v specified, defaulting to %s\n", requestedCollectors, DefaultMetricCollector)
+
+		validCollectors = append(validCollectors, DefaultMetricCollector)
+	}
 
 	return &DoctorConfig{
 		InteractiveMode:                  viper.GetBool("interactive"),
@@ -116,6 +150,7 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 		DefaultMonitoringIntervalSeconds: viper.GetInt(DefaultMonitoringIntervalSecondsFlagName),
 		DebugMode:                        debugMode,
 		Logger:                           logger,
+		MetricCollectors:                 validCollectors,
 		MaxMetricSamplesToRetainPerNode:  viper.GetInt(MaxMetricSamplesToRetainPerNodeFlagName),
 		MetricSamplesForSyntheticMetricCalculation: viper.GetInt(MetricSamplesForSyntheticMetricCalculationFlagName),
 	}, nil

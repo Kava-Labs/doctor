@@ -15,6 +15,7 @@ type CLIConfig struct {
 	KavaURL                                    string
 	MaxMetricSamplesToRetainPerNode            int
 	MetricSamplesForSyntheticMetricCalculation int
+	MetricCollectors                           []string
 	Logger                                     *log.Logger
 }
 
