@@ -85,6 +85,8 @@ func main() {
 			MaxMetricSamplesToRetainPerNode: config.MaxMetricSamplesToRetainPerNode,
 			MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
 			MetricCollectors: config.MetricCollectors,
+			MetricNamespace:  config.MetricNamespace,
+			AWSRegion:        config.AWSRegion,
 		}
 
 		gui, err := NewGUI(guiConfig)
@@ -110,6 +112,8 @@ func main() {
 			MaxMetricSamplesToRetainPerNode: config.MaxMetricSamplesToRetainPerNode,
 			MetricSamplesForSyntheticMetricCalculation: config.MetricSamplesForSyntheticMetricCalculation,
 			MetricCollectors: config.MetricCollectors,
+			MetricNamespace:  config.MetricNamespace,
+			AWSRegion:        config.AWSRegion,
 		}
 
 		cli, err := NewCLI(cliConfig)

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
@@ -26,6 +27,8 @@ type GUIConfig struct {
 	MaxMetricSamplesToRetainPerNode            int
 	MetricSamplesForSyntheticMetricCalculation int
 	MetricCollectors                           []string
+	AWSRegion                                  string
+	MetricNamespace                            string
 }
 
 // GUI controls the display
@@ -109,13 +112,17 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				g.newMessageFunc(fmt.Sprintf("error %s calculating hash rate for node %s\n", err, nodeId))
 			}
 
+			latestBlockHeight := syncStatusMetrics.SyncStatus.LatestBlockHeight
+			secondsBehindLive := syncStatusMetrics.SecondsBehindLive
+			syncStatusLatencyMilliseconds := syncStatusMetrics.SampleLatencyMilliseconds
+
 			updatedParagraph := fmt.Sprintf(
 				`Node %s
 			Latest Block Height %d
 			Seconds Behind Live %d
-			Blocks hashed per second %f
+			Blocks Hashed (per second) %f
 			Sync Status Latency (milliseconds) %d
-			`, nodeId, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, hashRatePerSecond, syncStatusMetrics.SampleLatencyMilliseconds)
+			`, nodeId, latestBlockHeight, secondsBehindLive, hashRatePerSecond, syncStatusLatencyMilliseconds)
 
 			g.draw(tickerCount, updatedParagraph)
 
@@ -131,6 +138,10 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 					NodeId:          nodeId,
 					BlocksPerSecond: hashRatePerSecond,
 				},
+				Value:               float64(hashRatePerSecond),
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       true,
+				CollectToCloudwatch: true,
 			}
 
 			metrics = append(metrics, hashRateMetric)
@@ -140,10 +151,51 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				Dimensions: map[string]string{
 					"node_id": nodeId,
 				},
-				Data: syncStatusMetrics,
+				Data:                syncStatusMetrics,
+				CollectToFile:       true,
+				CollectToCloudwatch: false,
 			}
 
 			metrics = append(metrics, syncStatusMetric)
+
+			latestBlockHeightMetric := metric.Metric{
+				Name: "LatestBlockHeight",
+				Dimensions: map[string]string{
+					"node_id": nodeId,
+				},
+				Value:               float64(latestBlockHeight),
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       false,
+				CollectToCloudwatch: true,
+			}
+
+			metrics = append(metrics, latestBlockHeightMetric)
+
+			secondsBehindLiveMetric := metric.Metric{
+				Name: "SecondsBehindLive",
+				Dimensions: map[string]string{
+					"node_id": nodeId,
+				},
+				Value:               float64(secondsBehindLive),
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       false,
+				CollectToCloudwatch: true,
+			}
+
+			metrics = append(metrics, secondsBehindLiveMetric)
+
+			statusCheckMillisecondLatencyMetric := metric.Metric{
+				Name: "StatusCheckLatencyMilliseconds",
+				Dimensions: map[string]string{
+					"node_id": nodeId,
+				},
+				Value:               float64(syncStatusLatencyMilliseconds),
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       false,
+				CollectToCloudwatch: true,
+			}
+
+			metrics = append(metrics, statusCheckMillisecondLatencyMetric)
 
 			for _, collector := range g.metricCollectors {
 				for _, metric := range metrics {
@@ -184,7 +236,11 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				Dimensions: map[string]string{
 					"endpoint_url": endpointURL,
 				},
-				Data: uptimeMetric,
+				Data:                uptimeMetric,
+				Value:               float64(uptimeMetric.RollingAveragePercentAvailable),
+				Timestamp:           uptimeMetric.SampledAt,
+				CollectToFile:       true,
+				CollectToCloudwatch: true,
 			}
 
 			metrics = append(metrics, uptimeMetricForCollection)
@@ -383,6 +439,20 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 			}
 
 			collectors = append(collectors, fileCollector)
+		case CloudwatchMetricCollector:
+			cloudwatchConfig := collect.CloudWatchCollectorConfig{
+				Ctx:             context.Background(),
+				AWSRegion:       config.AWSRegion,
+				MetricNamespace: config.MetricNamespace,
+			}
+
+			cloudwatchCollector, err := collect.NewCloudWatchCollector(cloudwatchConfig)
+
+			if err != nil {
+				return nil, err
+			}
+
+			collectors = append(collectors, cloudwatchCollector)
 		}
 	}
 

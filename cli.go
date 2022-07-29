@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -19,6 +20,8 @@ type CLIConfig struct {
 	MaxMetricSamplesToRetainPerNode            int
 	MetricSamplesForSyntheticMetricCalculation int
 	MetricCollectors                           []string
+	AWSRegion                                  string
+	MetricNamespace                            string
 	Logger                                     *log.Logger
 }
 
@@ -53,8 +56,12 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				c.Printf("error %s calculating hash rate for node %s\n", err, nodeId)
 			}
 
+			latestBlockHeight := syncStatusMetrics.SyncStatus.LatestBlockHeight
+			secondsBehindLive := syncStatusMetrics.SecondsBehindLive
+			syncStatusLatencyMilliseconds := syncStatusMetrics.SampleLatencyMilliseconds
+
 			// log to stdout
-			fmt.Printf("%s node %s is synched up to block %d, %d seconds behind live, hashing %f blocks per second, status check took %d milliseconds\n", kavaNodeRPCURL, nodeId, syncStatusMetrics.SyncStatus.LatestBlockHeight, syncStatusMetrics.SecondsBehindLive, hashRatePerSecond, syncStatusMetrics.SampleLatencyMilliseconds)
+			fmt.Printf("%s node %s is synched up to block %d, %d seconds behind live, hashing %f blocks per second, status check took %d milliseconds\n", kavaNodeRPCURL, nodeId, latestBlockHeight, secondsBehindLive, hashRatePerSecond, syncStatusLatencyMilliseconds)
 
 			// collect metrics to external storage backends
 			var metrics []metric.Metric
@@ -68,6 +75,10 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 					NodeId:          nodeId,
 					BlocksPerSecond: hashRatePerSecond,
 				},
+				Value:               float64(hashRatePerSecond),
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       true,
+				CollectToCloudwatch: true,
 			}
 
 			metrics = append(metrics, hashRateMetric)
@@ -77,10 +88,52 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				Dimensions: map[string]string{
 					"node_id": nodeId,
 				},
-				Data: syncStatusMetrics,
+				Data:                syncStatusMetrics,
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       true,
+				CollectToCloudwatch: false,
 			}
 
 			metrics = append(metrics, syncStatusMetric)
+
+			latestBlockHeightMetric := metric.Metric{
+				Name: "LatestBlockHeight",
+				Dimensions: map[string]string{
+					"node_id": nodeId,
+				},
+				Value:               float64(latestBlockHeight),
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       false,
+				CollectToCloudwatch: true,
+			}
+
+			metrics = append(metrics, latestBlockHeightMetric)
+
+			secondsBehindLiveMetric := metric.Metric{
+				Name: "SecondsBehindLive",
+				Dimensions: map[string]string{
+					"node_id": nodeId,
+				},
+				Value:               float64(secondsBehindLive),
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       false,
+				CollectToCloudwatch: true,
+			}
+
+			metrics = append(metrics, secondsBehindLiveMetric)
+
+			statusCheckMillisecondLatencyMetric := metric.Metric{
+				Name: "StatusCheckLatencyMilliseconds",
+				Dimensions: map[string]string{
+					"node_id": nodeId,
+				},
+				Value:               float64(syncStatusLatencyMilliseconds),
+				Timestamp:           syncStatusMetrics.SampledAt,
+				CollectToFile:       false,
+				CollectToCloudwatch: true,
+			}
+
+			metrics = append(metrics, statusCheckMillisecondLatencyMetric)
 
 			for _, collector := range c.metricCollectors {
 				for _, metric := range metrics {
@@ -119,7 +172,11 @@ func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				Dimensions: map[string]string{
 					"endpoint_url": endpointURL,
 				},
-				Data: uptimeMetric,
+				Data:                uptimeMetric,
+				Value:               float64(uptimeMetric.RollingAveragePercentAvailable),
+				Timestamp:           uptimeMetric.SampledAt,
+				CollectToFile:       true,
+				CollectToCloudwatch: true,
 			}
 
 			metrics = append(metrics, uptimeMetricForCollection)
@@ -160,6 +217,20 @@ func NewCLI(config CLIConfig) (*CLI, error) {
 			}
 
 			collectors = append(collectors, fileCollector)
+		case CloudwatchMetricCollector:
+			cloudwatchConfig := collect.CloudWatchCollectorConfig{
+				Ctx:             context.Background(),
+				AWSRegion:       config.AWSRegion,
+				MetricNamespace: config.MetricNamespace,
+			}
+
+			cloudwatchCollector, err := collect.NewCloudWatchCollector(cloudwatchConfig)
+
+			if err != nil {
+				return nil, err
+			}
+
+			collectors = append(collectors, cloudwatchCollector)
 		}
 	}
 

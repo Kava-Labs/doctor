@@ -30,6 +30,8 @@ const (
 	DefaultMetricCollector                             = "file"
 	FileMetricCollector                                = "file"
 	CloudwatchMetricCollector                          = "cloudwatch"
+	AWSRegionFlagName                                  = "aws_region"
+	MetricNamespaceFlagName                            = "metric_namespace"
 )
 
 var (
@@ -50,6 +52,8 @@ var (
 	maxMetricSamplesToRetainPerNodeFlag            = flag.Int(MaxMetricSamplesToRetainPerNodeFlagName, DefaultMetricSamplesToKeepPerNode, "maximum number of metric samples that will be kept in memory per node")
 	metricSamplesForSyntheticMetricCalculationFlag = flag.Int(MetricSamplesForSyntheticMetricCalculationFlagName, DefaultMetricSamplesForSyntheticMetricCalculation, "number of metric samples to use when calculating synthetic metrics such as the node hash rate")
 	metricCollectorsFlag                           = flag.String(MetricCollectorsFlagName, DefaultMetricCollector, fmt.Sprintf("where to send collected metrics to, multiple collectors can be specified as a comma separated list, supported collectors are %v", ValidMetricCollectors))
+	awsRegionFlag                                  = flag.String(AWSRegionFlagName, "us-east-1", "aws region to use for sending metrics to CloudWatch")
+	metricNamespaceFlag                            = flag.String(MetricNamespaceFlagName, "kava", "top level namespace to use for grouping all metrics sent to cloudwatch")
 )
 
 // DoctorConfig wraps values used to configure
@@ -62,6 +66,8 @@ type DoctorConfig struct {
 	MaxMetricSamplesToRetainPerNode            int
 	MetricSamplesForSyntheticMetricCalculation int
 	MetricCollectors                           []string
+	AWSRegion                                  string
+	MetricNamespace                            string
 	Logger                                     *log.Logger
 }
 
@@ -153,5 +159,7 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 		MetricCollectors:                 validCollectors,
 		MaxMetricSamplesToRetainPerNode:  viper.GetInt(MaxMetricSamplesToRetainPerNodeFlagName),
 		MetricSamplesForSyntheticMetricCalculation: viper.GetInt(MetricSamplesForSyntheticMetricCalculationFlagName),
+		AWSRegion:       viper.GetString(AWSRegionFlagName),
+		MetricNamespace: viper.GetString(MetricNamespaceFlagName),
 	}, nil
 }

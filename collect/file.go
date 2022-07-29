@@ -75,6 +75,11 @@ func NewFileCollector(config FileCollectorConfig) (*FileCollector, error) {
 // to ensure an in progress collection completes cleanly before
 // a new metric is collected
 func (fc *FileCollector) Collect(metric metric.Metric) error {
+	if !metric.CollectToFile {
+		// no-op
+		return nil
+	}
+
 	// grab the lock
 	fc.fileLock.Lock()
 

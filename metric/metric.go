@@ -13,9 +13,13 @@ type MetricDimensions = map[string]string
 
 // Metric represents an arbitrary metric
 type Metric struct {
-	Name       string           `json:"name"`
-	Dimensions MetricDimensions `json:"dimensions"`
-	Data       interface{}      `json:"data"`
+	Name                string           `json:"name"`
+	Dimensions          MetricDimensions `json:"dimensions"`
+	Data                interface{}      `json:"data"`
+	CollectToFile       bool             `json:"-"` // whether this metric should be collected to a file
+	CollectToCloudwatch bool             `json:"-"` // whether this metric should be collect to CloudWatch
+	Value               float64          `json:"-"` // only used for collecting metrics to AWS CloudWatch
+	Timestamp           time.Time        `json:"-"` // only used for collecting metrics to AWS CloudWatch
 }
 
 // SyncStatusMetrics wraps metrics collected
