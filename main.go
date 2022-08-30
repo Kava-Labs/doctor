@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/kava-labs/doctor/config"
 	"github.com/kava-labs/doctor/metric"
 )
 
@@ -45,7 +46,7 @@ func main() {
 	}
 
 	// parse desired configuration
-	config, err := GetDoctorConfig()
+	config, err := config.GetDoctorConfig()
 
 	if err != nil {
 		panic(err)

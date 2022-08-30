@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"github.com/kava-labs/doctor/collect"
+	dconfig "github.com/kava-labs/doctor/config"
 	"github.com/kava-labs/doctor/metric"
 )
 
@@ -209,7 +210,7 @@ func NewCLI(config CLIConfig) (*CLI, error) {
 
 	for _, collector := range config.MetricCollectors {
 		switch collector {
-		case FileMetricCollector:
+		case dconfig.FileMetricCollector:
 			fileCollector, err := collect.NewFileCollector(collect.FileCollectorConfig{})
 
 			if err != nil {
@@ -217,7 +218,7 @@ func NewCLI(config CLIConfig) (*CLI, error) {
 			}
 
 			collectors = append(collectors, fileCollector)
-		case CloudwatchMetricCollector:
+		case dconfig.CloudwatchMetricCollector:
 			cloudwatchConfig := collect.CloudWatchCollectorConfig{
 				Ctx:             context.Background(),
 				AWSRegion:       config.AWSRegion,
