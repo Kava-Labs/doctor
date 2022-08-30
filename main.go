@@ -63,6 +63,7 @@ func main() {
 	nodeConfig := NodeClientConfig{
 		RPCEndpoint:                      config.KavaNodeRPCURL,
 		DefaultMonitoringIntervalSeconds: config.DefaultMonitoringIntervalSeconds,
+		Autoheal:                         config.Autoheal,
 	}
 
 	nodeClient, err := NewNodeClient(nodeConfig)

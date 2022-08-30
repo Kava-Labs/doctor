@@ -20,6 +20,7 @@ import (
 type NodeClientConfig struct {
 	RPCEndpoint                      string
 	DefaultMonitoringIntervalSeconds int
+	Autoheal                         bool // whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
 }
 
 // NodeClient provides methods

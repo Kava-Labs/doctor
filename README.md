@@ -9,6 +9,7 @@ Kava application and node infrastructure health monitoring daemon with configura
 ```bash
 $ doctor --help
 Usage of doctor:
+      --autoheal                                          whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
       --aws_region string                                 aws region to use for sending metrics to CloudWatch (default "us-east-1")
       --config_filepath string                            filepath to json config file to use (default "~/.kava/doctor/config.json")
       --debug                                             controls whether debug logging is enabled
@@ -37,7 +38,8 @@ An example configuration file is provided below:
   "metric_samples_to_use_for_synthetic_metrics": 60,
   "metric_collectors": "file,cloudwatch",
   "metric_namespace": "kava/mainnet-archive",
-  "aws_region": "us-east-1"
+  "aws_region": "us-east-1",
+  "autoheal: true
 }
 ```
 
