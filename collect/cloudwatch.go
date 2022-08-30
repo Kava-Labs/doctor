@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	awsTypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 // CloudWatchCollectorConfig wraps values
@@ -25,6 +27,7 @@ type CloudWatchCollector struct {
 	cloudwatchClient *cloudwatch.Client
 	ctx              context.Context
 	metricNamespace  string
+	awsInstanceId    string
 }
 
 // NewCloudWatchCollector attempts to create a new CloudWatchCollector
@@ -37,16 +40,38 @@ func NewCloudWatchCollector(config CloudWatchCollectorConfig) (*CloudWatchCollec
 	cfg, err := awsConfig.LoadDefaultConfig(config.Ctx,
 		awsConfig.WithRegion(config.AWSRegion),
 	)
+
 	if err != nil {
 		return nil, err
 	}
 
 	cloudwatchClient := cloudwatch.NewFromConfig(cfg)
 
+	var awsInstanceId string
+
+	awsSession, err := session.NewSession()
+
+	if err != nil {
+		return nil, err
+	}
+
+	ec2MetadataClient := ec2metadata.New(awsSession)
+
+	nodeEC2IdentityDocument, err := ec2MetadataClient.GetInstanceIdentityDocument()
+
+	if err != nil {
+		// fail gracefully if doctor is running in a non-aws environment
+		// e.g. a laptop
+		awsInstanceId = ""
+	} else {
+		awsInstanceId = nodeEC2IdentityDocument.InstanceID
+	}
+
 	return &CloudWatchCollector{
 		ctx:              config.Ctx,
 		cloudwatchClient: cloudwatchClient,
 		metricNamespace:  config.MetricNamespace,
+		awsInstanceId:    awsInstanceId,
 	}, nil
 }
 
@@ -65,6 +90,13 @@ func (cwc *CloudWatchCollector) Collect(metric metric.Metric) error {
 		awsDimensions = append(awsDimensions, awsTypes.Dimension{
 			Name:  &key,
 			Value: &value,
+		})
+	}
+
+	if cwc.awsInstanceId != "" {
+		awsDimensions = append(awsDimensions, awsTypes.Dimension{
+			Name:  aws.String("instance-id"),
+			Value: &cwc.awsInstanceId,
 		})
 	}
 

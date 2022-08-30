@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/kava-labs/doctor/config"
 	"github.com/kava-labs/doctor/metric"
 )
 
@@ -45,7 +46,7 @@ func main() {
 	}
 
 	// parse desired configuration
-	config, err := GetDoctorConfig()
+	config, err := config.GetDoctorConfig()
 
 	if err != nil {
 		panic(err)
@@ -61,8 +62,10 @@ func main() {
 	// metrics such as current block height and time
 	// for the doctor to use the watch the health of the node
 	nodeConfig := NodeClientConfig{
-		RPCEndpoint:                      config.KavaNodeRPCURL,
-		DefaultMonitoringIntervalSeconds: config.DefaultMonitoringIntervalSeconds,
+		RPCEndpoint:                         config.KavaNodeRPCURL,
+		DefaultMonitoringIntervalSeconds:    config.DefaultMonitoringIntervalSeconds,
+		Autoheal:                            config.Autoheal,
+		AutohealSyncLatencyToleranceSeconds: config.AutohealSyncLatencyToleranceSeconds,
 	}
 
 	nodeClient, err := NewNodeClient(nodeConfig)

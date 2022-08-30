@@ -1,7 +1,7 @@
 // config.go contains types, functions and methods for finding
 // reading, and setting configuration values used to run the doctor program
 
-package main
+package config
 
 import (
 	"flag"
@@ -32,6 +32,13 @@ const (
 	CloudwatchMetricCollector                          = "cloudwatch"
 	AWSRegionFlagName                                  = "aws_region"
 	MetricNamespaceFlagName                            = "metric_namespace"
+	AutohealFlagName                                   = "autoheal"
+	AutohealSyncLatencyToleranceSecondsFlagName        = "autoheal_sync_latency_tolerance_seconds"
+)
+
+const (
+	DefaultMetricSamplesToKeepPerNode                 = 10000
+	DefaultMetricSamplesForSyntheticMetricCalculation = 60
 )
 
 var (
@@ -54,6 +61,8 @@ var (
 	metricCollectorsFlag                           = flag.String(MetricCollectorsFlagName, DefaultMetricCollector, fmt.Sprintf("where to send collected metrics to, multiple collectors can be specified as a comma separated list, supported collectors are %v", ValidMetricCollectors))
 	awsRegionFlag                                  = flag.String(AWSRegionFlagName, "us-east-1", "aws region to use for sending metrics to CloudWatch")
 	metricNamespaceFlag                            = flag.String(MetricNamespaceFlagName, "kava", "top level namespace to use for grouping all metrics sent to cloudwatch")
+	autohealFlag                                   = flag.Bool(AutohealFlagName, false, "whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)")
+	autohealSyncLatencyToleranceSecondsFlag        = flag.Int(AutohealSyncLatencyToleranceSecondsFlagName, 120, "how far behind live the node is allowed to fall before autohealing actions are attempted")
 )
 
 // DoctorConfig wraps values used to configure
@@ -69,6 +78,8 @@ type DoctorConfig struct {
 	AWSRegion                                  string
 	MetricNamespace                            string
 	Logger                                     *log.Logger
+	Autoheal                                   bool
+	AutohealSyncLatencyToleranceSeconds        int
 }
 
 // GetDoctorConfig gets an instance of DoctorConfig
@@ -159,7 +170,9 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 		MetricCollectors:                 validCollectors,
 		MaxMetricSamplesToRetainPerNode:  viper.GetInt(MaxMetricSamplesToRetainPerNodeFlagName),
 		MetricSamplesForSyntheticMetricCalculation: viper.GetInt(MetricSamplesForSyntheticMetricCalculationFlagName),
-		AWSRegion:       viper.GetString(AWSRegionFlagName),
-		MetricNamespace: viper.GetString(MetricNamespaceFlagName),
+		AWSRegion:                           viper.GetString(AWSRegionFlagName),
+		MetricNamespace:                     viper.GetString(MetricNamespaceFlagName),
+		Autoheal:                            viper.GetBool(AutohealFlagName),
+		AutohealSyncLatencyToleranceSeconds: viper.GetInt(AutohealSyncLatencyToleranceSecondsFlagName),
 	}, nil
 }

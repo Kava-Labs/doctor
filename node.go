@@ -12,14 +12,17 @@ import (
 	"time"
 
 	"github.com/kava-labs/doctor/clients/kava"
+	"github.com/kava-labs/doctor/heal"
 	"github.com/kava-labs/doctor/metric"
 )
 
 // NodeClientConfig wraps config
 // used for creating a NodeClient
 type NodeClientConfig struct {
-	RPCEndpoint                      string
-	DefaultMonitoringIntervalSeconds int
+	RPCEndpoint                         string
+	DefaultMonitoringIntervalSeconds    int
+	Autoheal                            bool // whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
+	AutohealSyncLatencyToleranceSeconds int
 }
 
 // NodeClient provides methods
@@ -86,15 +89,8 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			}
 
 			var secondsBehindLive int64
-
-			// only need to calculate secondsBehindLive
-			// if the node isn't caught up, otherwise can
-			// ignore the time diff between when the last block
-			// was created and this measurement was recorded
-			if nodeState.SyncInfo.CatchingUp {
-				currentSyncTime := nodeState.SyncInfo.LatestBlockTime
-				secondsBehindLive = int64(time.Since(currentSyncTime).Seconds())
-			}
+			currentSyncTime := nodeState.SyncInfo.LatestBlockTime
+			secondsBehindLive = int64(time.Since(currentSyncTime).Seconds())
 
 			metrics := metric.SyncStatusMetrics{
 				SampledAt:                 startTime,
@@ -109,6 +105,15 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				syncStatusMetrics <- metrics
 				uptimeMetrics <- uptimeMetric
 			}()
+
+			if nc.config.Autoheal {
+				if secondsBehindLive > int64(nc.config.AutohealSyncLatencyToleranceSeconds) {
+					go func() {
+						logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, attempting autohealing actions", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
+					}()
+					go heal.StandbyNodeUntilCaughtUp(logMessages)
+				}
+			}
 		}
 	}
 }

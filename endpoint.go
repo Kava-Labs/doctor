@@ -3,12 +3,8 @@ package main
 import (
 	"errors"
 
+	dconfig "github.com/kava-labs/doctor/config"
 	"github.com/kava-labs/doctor/metric"
-)
-
-const (
-	DefaultMetricSamplesToKeepPerNode                 = 10000
-	DefaultMetricSamplesForSyntheticMetricCalculation = 60
 )
 
 var (
@@ -46,8 +42,8 @@ type EndpointConfig struct {
 // NewEndpoint returns a new endpoint for tracking
 // metrics related to all nodes behind the endpoint
 func NewEndpoint(config EndpointConfig) *Endpoint {
-	metricSamplesToKeepPerNode := DefaultMetricSamplesToKeepPerNode
-	metricSamplesForSyntheticMetricCalculation := DefaultMetricSamplesForSyntheticMetricCalculation
+	metricSamplesToKeepPerNode := dconfig.DefaultMetricSamplesToKeepPerNode
+	metricSamplesForSyntheticMetricCalculation := dconfig.DefaultMetricSamplesForSyntheticMetricCalculation
 
 	if config.MetricSamplesToKeepPerNode > 0 {
 		metricSamplesToKeepPerNode = config.MetricSamplesToKeepPerNode

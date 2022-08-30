@@ -12,7 +12,9 @@ import (
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
+
 	"github.com/kava-labs/doctor/collect"
+	dconfig "github.com/kava-labs/doctor/config"
 	"github.com/kava-labs/doctor/metric"
 	"github.com/spf13/viper"
 )
@@ -431,7 +433,7 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 
 	for _, collector := range config.MetricCollectors {
 		switch collector {
-		case FileMetricCollector:
+		case dconfig.FileMetricCollector:
 			fileCollector, err := collect.NewFileCollector(collect.FileCollectorConfig{})
 
 			if err != nil {
@@ -439,7 +441,7 @@ func NewGUI(config GUIConfig) (*GUI, error) {
 			}
 
 			collectors = append(collectors, fileCollector)
-		case CloudwatchMetricCollector:
+		case dconfig.CloudwatchMetricCollector:
 			cloudwatchConfig := collect.CloudWatchCollectorConfig{
 				Ctx:             context.Background(),
 				AWSRegion:       config.AWSRegion,
