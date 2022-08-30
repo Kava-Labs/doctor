@@ -62,9 +62,10 @@ func main() {
 	// metrics such as current block height and time
 	// for the doctor to use the watch the health of the node
 	nodeConfig := NodeClientConfig{
-		RPCEndpoint:                      config.KavaNodeRPCURL,
-		DefaultMonitoringIntervalSeconds: config.DefaultMonitoringIntervalSeconds,
-		Autoheal:                         config.Autoheal,
+		RPCEndpoint:                         config.KavaNodeRPCURL,
+		DefaultMonitoringIntervalSeconds:    config.DefaultMonitoringIntervalSeconds,
+		Autoheal:                            config.Autoheal,
+		AutohealSyncLatencyToleranceSeconds: config.AutohealSyncLatencyToleranceSeconds,
 	}
 
 	nodeClient, err := NewNodeClient(nodeConfig)

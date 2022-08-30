@@ -10,6 +10,7 @@ Kava application and node infrastructure health monitoring daemon with configura
 $ doctor --help
 Usage of doctor:
       --autoheal                                          whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
+      --autoheal_sync_latency_tolerance_seconds int       how far behind live the node is allowed to fall before autohealing actions are attempted (default 120)
       --aws_region string                                 aws region to use for sending metrics to CloudWatch (default "us-east-1")
       --config_filepath string                            filepath to json config file to use (default "~/.kava/doctor/config.json")
       --debug                                             controls whether debug logging is enabled
