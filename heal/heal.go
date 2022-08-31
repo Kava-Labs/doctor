@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/kava-labs/doctor/clients/kava"
-	"github.com/kava-labs/doctor/config"
-	"github.com/spf13/viper"
 )
 
 // AwsDoctor is a doctor that is capable
@@ -40,19 +39,13 @@ type ActiveHealerCounter struct {
 // on in standby (to shift resources that would be consumed by an api node
 // serving production client requests towards synching up to live faster)
 // until it catches back up.
-func StandbyNodeUntilCaughtUp(logMessages chan<- string, lock *ActiveHealerCounter) {
+func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client) {
 	if initErrorMessage != nil {
 		logMessages <- fmt.Sprintf("healer init failed with error %s, skipping attempt to heal via StandbyNodeUntilCaughtUp", *initErrorMessage)
 		return
 	}
 
-	// mark healing as in process
-	lock.Lock()
-	lock.Count++
-
-	// ensure the healing process releases the lock regardless of success
-	defer func() { lock.Count-- }()
-	defer lock.Unlock()
+	awsDoctor.kava = kavaClient
 
 	awsInstanceId := awsDoctor.instanceId
 
@@ -106,11 +99,16 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, lock *ActiveHealerCount
 	}
 
 	if !kavaStatus.SyncInfo.CatchingUp {
+		logMessages <- "StandbyNodeUntilCaughtUp: node is out of sync and doesn't know it, restarting kava"
+
 		err = RestartKavaService()
 
 		if err != nil {
 			logMessages <- fmt.Sprintf("error %s restarting kava service attempting to heal via StandbyNodeUntilCaughtUp", err)
 		}
+	} else {
+		logMessages <- "StandbyNodeUntilCaughtUp: node is out of sync and knows it, not restarting kava"
+
 	}
 
 	// wait until the kava process catches back up to live
@@ -125,6 +123,10 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, lock *ActiveHealerCount
 		if !kavaStatus.SyncInfo.CatchingUp {
 			break
 		}
+
+		logMessages <- "StandbyNodeUntilCaughtUp: node is still catching up"
+
+		time.Sleep(5 * time.Second)
 	}
 
 	// put the node back in service
@@ -144,7 +146,7 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, lock *ActiveHealerCount
 			continue
 		}
 
-		logMessages <- fmt.Sprintf("host exited standby %+v", state.Activities)
+		logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: host exited standby %+v", state.Activities)
 
 		exitedStandby = true
 	}
@@ -199,21 +201,9 @@ func NewAwsDoctor() (*AwsDoctor, error) {
 
 	autoscalingClient := autoscaling.New(awsSession)
 
-	// create kava client for healer to monitor the kava node
-	kavaClientConfig := kava.ClientConfig{
-		JSONRPCURL: viper.GetString(config.KavaAPIAddressFlagName),
-	}
-
-	kavaClient, err := kava.New(kavaClientConfig)
-
-	if err != nil {
-		return nil, fmt.Errorf("error %s creating kava api client using params %+v", err, kavaClientConfig)
-	}
-
 	return &AwsDoctor{
 		instanceId:        eC2IdentityDocument.InstanceID,
 		autoscalingClient: autoscalingClient,
-		kava:              kavaClient,
 	}, nil
 }
 

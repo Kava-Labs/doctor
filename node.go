@@ -112,21 +112,34 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 
 			if nc.config.Autoheal {
 				if secondsBehindLive > int64(nc.config.AutohealSyncLatencyToleranceSeconds) {
-					// check to see if there is already a healer working on this issue
-					nc.healCounter.Lock()
-					defer nc.healCounter.Unlock()
-
-					// only have one healer working on the same issue at once
-					if nc.healCounter.Count != 0 {
-						return
-					}
-
 					go func() {
-						logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, attempting autohealing actions", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
-					}()
+						// check to see if there is already a healer working on this issue
+						nc.healCounter.Lock()
 
-					// node, heal thyself
-					go heal.StandbyNodeUntilCaughtUp(logMessages, nc.healCounter)
+						// only have one healer working on the same issue at once
+						if nc.healCounter.Count != 0 {
+							return
+						}
+
+						nc.healCounter.Count++
+
+						nc.healCounter.Unlock()
+
+						go func() {
+							logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, attempting autohealing actions", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
+						}()
+
+						// node, heal thyself
+						go func() {
+							defer func() {
+								nc.healCounter.Lock()
+								nc.healCounter.Count++
+								nc.healCounter.Unlock()
+							}()
+
+							heal.StandbyNodeUntilCaughtUp(logMessages, nc.Client)
+						}()
+					}()
 				}
 			}
 		}
