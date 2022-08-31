@@ -39,6 +39,8 @@ type CLI struct {
 // Watch watches for new measurements and log messages for the kava node with the
 // specified rpc api url, outputting them to the cli device in the desired format
 func (c *CLI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <-chan string, kavaNodeRPCURL string) error {
+	// handle logging in separate go-routines to avoid
+	// congestion with metric event emission
 	go func() {
 		for logMessage := range logMessages {
 			c.Println(logMessage)

@@ -126,7 +126,7 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 
 		logMessages <- "StandbyNodeUntilCaughtUp: node is still catching up"
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Minute)
 	}
 
 	// put the node back in service
