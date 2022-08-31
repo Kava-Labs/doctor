@@ -63,6 +63,20 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 	// an event every second
 	ticker := time.NewTicker(time.Second * time.Duration(g.refreshRateSeconds)).C
 
+	// handle logging in separate go-routines to avoid
+	// congestion with metric event emission
+	go func() {
+		// events triggered by debug worthy events
+		for logMessage := range logMessages {
+			// TODO: separate channels
+			// for debug only log messages?
+			if !g.debugMode {
+				continue
+			}
+			g.newMessageFunc(logMessage)
+		}
+	}()
+
 	for {
 		select {
 		// events triggered by user input
@@ -257,15 +271,6 @@ func (g *GUI) Watch(metricReadOnlyChannels MetricReadOnlyChannels, logMessages <
 				}
 
 			}
-		// events triggered by debug worthy events
-		case logMessage := <-logMessages:
-			// TODO: separate channels
-			// for debug only log messages?
-			if !g.debugMode {
-				continue
-			}
-
-			g.newMessageFunc(logMessage)
 		// events triggered on a regular time based interval
 		case <-ticker:
 			g.updateParagraph(tickerCount)

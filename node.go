@@ -30,7 +30,8 @@ type NodeClientConfig struct {
 // API and OS shell for a given node
 type NodeClient struct {
 	*kava.Client
-	config NodeClientConfig
+	config      NodeClientConfig
+	healCounter *heal.ActiveHealerCounter
 }
 
 // NewNodeCLient creates and returns a new node client
@@ -44,9 +45,12 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 		panic(fmt.Errorf("%w: could not initialize kava client", err))
 	}
 
+	healCounter := heal.ActiveHealerCounter{}
+
 	return &NodeClient{
-		config: config,
-		Client: kavaClient,
+		config:      config,
+		Client:      kavaClient,
+		healCounter: &healCounter,
 	}, nil
 }
 
@@ -109,9 +113,33 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			if nc.config.Autoheal {
 				if secondsBehindLive > int64(nc.config.AutohealSyncLatencyToleranceSeconds) {
 					go func() {
-						logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, attempting autohealing actions", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
+						// check to see if there is already a healer working on this issue
+						nc.healCounter.Lock()
+
+						// only have one healer working on the same issue at once
+						if nc.healCounter.Count != 0 {
+							return
+						}
+
+						nc.healCounter.Count++
+
+						nc.healCounter.Unlock()
+
+						go func() {
+							logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, attempting autohealing actions", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
+						}()
+
+						// node, heal thyself
+						go func() {
+							defer func() {
+								nc.healCounter.Lock()
+								nc.healCounter.Count++
+								nc.healCounter.Unlock()
+							}()
+
+							heal.StandbyNodeUntilCaughtUp(logMessages, nc.Client)
+						}()
 					}()
-					go heal.StandbyNodeUntilCaughtUp(logMessages)
 				}
 			}
 		}
