@@ -3,6 +3,7 @@ package heal
 import (
 	"fmt"
 	"os/exec"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -26,15 +27,32 @@ var (
 	initErrorMessage *string
 )
 
+// ActiveHealerCounter wraps values
+// for safe and accurate concurrent
+// book keeping of the number of active
+// healer routines in flight for a given host
+type ActiveHealerCounter struct {
+	sync.Mutex
+	Count int
+}
+
 // StandbyNodeUntilCaughtUp will keep the ec2 instance the kava node is
 // on in standby (to shift resources that would be consumed by an api node
 // serving production client requests towards synching up to live faster)
 // until it catches back up.
-func StandbyNodeUntilCaughtUp(logMessages chan<- string) {
+func StandbyNodeUntilCaughtUp(logMessages chan<- string, lock *ActiveHealerCounter) {
 	if initErrorMessage != nil {
 		logMessages <- fmt.Sprintf("healer init failed with error %s, skipping attempt to heal via StandbyNodeUntilCaughtUp", *initErrorMessage)
 		return
 	}
+
+	// mark healing as in process
+	lock.Lock()
+	lock.Count++
+
+	// ensure the healing process releases the lock regardless of success
+	defer func() { lock.Count-- }()
+	defer lock.Unlock()
 
 	awsInstanceId := awsDoctor.instanceId
 
