@@ -57,20 +57,22 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 	})
 
 	if err != nil {
-		logMessages <- fmt.Sprintf("error %s checking autoscaling state for instance %s", err, awsInstanceId)
+		logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: error %s checking autoscaling state for instance %s", err, awsInstanceId)
 		return
 	}
 
 	if len(autoscalingInstances.AutoScalingInstances) != 1 {
-		logMessages <- fmt.Sprintf("expected exactly one instance with id %s, got %+v", awsInstanceId, autoscalingInstances.AutoScalingInstances)
+		logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: expected exactly one instance with id %s, got %+v", awsInstanceId, autoscalingInstances.AutoScalingInstances)
 		return
 	}
 
 	autoscalingGroupName := autoscalingInstances.AutoScalingInstances[0].AutoScalingGroupName
 
+	var placedOnStandby bool
 	// place the host in standby with the autoscaling group
-	// if it's not already in standby
-	if *autoscalingInstances.AutoScalingInstances[0].LifecycleState != autoscaling.LifecycleStateStandby {
+	// if it's in service so it won't get any more requests
+	// until it syncs back to live
+	if *autoscalingInstances.AutoScalingInstances[0].LifecycleState == autoscaling.LifecycleStateInService {
 		state, err := awsDoctor.autoscalingClient.EnterStandby(&autoscaling.EnterStandbyInput{
 			AutoScalingGroupName: autoscalingGroupName,
 			InstanceIds: []*string{
@@ -80,35 +82,16 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 		})
 
 		if err != nil {
-			logMessages <- fmt.Sprintf("error %s placing host on standby", err)
+			logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: error %s placing host on standby", err)
 
 			return
 		}
 
-		logMessages <- fmt.Sprintf("host entered standby state with autoscaling group %+v", state.Activities)
+		placedOnStandby = true
+
+		logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: host entered standby state with autoscaling group %+v", state.Activities)
 	} else {
-		logMessages <- "host is already in standby state with the autoscaling group"
-	}
-
-	// restart the kava process if it thinks it is not catching up
-	kavaStatus, err := awsDoctor.kava.GetNodeState()
-
-	if err != nil {
-		logMessages <- fmt.Sprintf("error %s attempting to get kava status", err)
-		return
-	}
-
-	if !kavaStatus.SyncInfo.CatchingUp {
-		logMessages <- "StandbyNodeUntilCaughtUp: node is out of sync and doesn't know it, restarting kava"
-
-		err = RestartKavaService()
-
-		if err != nil {
-			logMessages <- fmt.Sprintf("error %s restarting kava service attempting to heal via StandbyNodeUntilCaughtUp", err)
-		}
-	} else {
-		logMessages <- "StandbyNodeUntilCaughtUp: node is out of sync and knows it, not restarting kava"
-
+		logMessages <- "StandbyNodeUntilCaughtUp: host is not currently in service, not moving to standby"
 	}
 
 	// wait until the kava process catches back up to live
@@ -116,11 +99,15 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 		kavaStatus, err := awsDoctor.kava.GetNodeState()
 
 		if err != nil {
-			logMessages <- fmt.Sprintf("error %s attempting to get kava status", err)
+			logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: error %s attempting to get kava status, sleeping for a minute before retrying", err)
+
+			time.Sleep(1 * time.Minute)
+
 			continue
 		}
 
 		if !kavaStatus.SyncInfo.CatchingUp {
+			logMessages <- "StandbyNodeUntilCaughtUp: node caught back up"
 			break
 		}
 
@@ -130,26 +117,30 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 	}
 
 	// put the node back in service
-	var exitedStandby bool
-	for !exitedStandby {
-		state, err := awsDoctor.autoscalingClient.ExitStandby(&autoscaling.ExitStandbyInput{
-			AutoScalingGroupName: autoscalingGroupName,
-			InstanceIds: []*string{
-				aws.String(awsInstanceId),
-			},
-		})
+	if placedOnStandby {
+		var exitedStandby bool
+		for !exitedStandby {
+			state, err := awsDoctor.autoscalingClient.ExitStandby(&autoscaling.ExitStandbyInput{
+				AutoScalingGroupName: autoscalingGroupName,
+				InstanceIds: []*string{
+					aws.String(awsInstanceId),
+				},
+			})
 
-		// keep trying if we encountered an error
-		if err != nil {
-			logMessages <- fmt.Sprintf("error %s attempting to exit standby", err)
+			// keep trying if we encountered an error
+			if err != nil {
+				logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: error %s attempting to exit standby", err)
 
-			continue
+				continue
+			}
+
+			logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: host exited standby %+v", state.Activities)
+
+			exitedStandby = true
 		}
-
-		logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: host exited standby %+v", state.Activities)
-
-		exitedStandby = true
 	}
+
+	logMessages <- "StandbyNodeUntilCaughtUp: node healed successfully by doctor"
 }
 
 // RestartKavaService restarts the kava service
