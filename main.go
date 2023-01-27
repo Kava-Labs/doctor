@@ -66,6 +66,7 @@ func main() {
 		DefaultMonitoringIntervalSeconds:    config.DefaultMonitoringIntervalSeconds,
 		Autoheal:                            config.Autoheal,
 		AutohealSyncLatencyToleranceSeconds: config.AutohealSyncLatencyToleranceSeconds,
+		AutohealSyncToLiveToleranceSeconds:  config.AutohealSyncToLiveToleranceSeconds,
 	}
 
 	nodeClient, err := NewNodeClient(nodeConfig)

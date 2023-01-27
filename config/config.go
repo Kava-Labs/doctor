@@ -34,6 +34,7 @@ const (
 	MetricNamespaceFlagName                            = "metric_namespace"
 	AutohealFlagName                                   = "autoheal"
 	AutohealSyncLatencyToleranceSecondsFlagName        = "autoheal_sync_latency_tolerance_seconds"
+	AutohealSyncToLiveToleranceSecondsFlagName         = "autoheal_sync_to_live_tolerance_seconds"
 )
 
 const (
@@ -63,6 +64,7 @@ var (
 	metricNamespaceFlag                            = flag.String(MetricNamespaceFlagName, "kava", "top level namespace to use for grouping all metrics sent to cloudwatch")
 	autohealFlag                                   = flag.Bool(AutohealFlagName, false, "whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)")
 	autohealSyncLatencyToleranceSecondsFlag        = flag.Int(AutohealSyncLatencyToleranceSecondsFlagName, 120, "how far behind live the node is allowed to fall before autohealing actions are attempted")
+	autohealSyncToLiveToleranceSecondsFlag         = flag.Int(AutohealSyncToLiveToleranceSecondsFlagName, 12, "how close to the current time the node must resync to before being considered in sync again")
 )
 
 // DoctorConfig wraps values used to configure
@@ -80,6 +82,7 @@ type DoctorConfig struct {
 	Logger                                     *log.Logger
 	Autoheal                                   bool
 	AutohealSyncLatencyToleranceSeconds        int
+	AutohealSyncToLiveToleranceSeconds         int
 }
 
 // GetDoctorConfig gets an instance of DoctorConfig
@@ -174,5 +177,6 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 		MetricNamespace:                     viper.GetString(MetricNamespaceFlagName),
 		Autoheal:                            viper.GetBool(AutohealFlagName),
 		AutohealSyncLatencyToleranceSeconds: viper.GetInt(AutohealSyncLatencyToleranceSecondsFlagName),
+		AutohealSyncToLiveToleranceSeconds:  viper.GetInt(AutohealSyncToLiveToleranceSecondsFlagName),
 	}, nil
 }

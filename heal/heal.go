@@ -35,11 +35,17 @@ type ActiveHealerCounter struct {
 	Count int
 }
 
+// HealerConfig wraps values for use by one or more
+// runs of one or more healer routines
+type HealerConfig struct {
+	AutohealSyncToLiveToleranceSeconds int
+}
+
 // StandbyNodeUntilCaughtUp will keep the ec2 instance the kava node is
 // on in standby (to shift resources that would be consumed by an api node
 // serving production client requests towards synching up to live faster)
 // until it catches back up.
-func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client) {
+func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client, healerConfig HealerConfig) {
 	if initErrorMessage != nil {
 		logMessages <- fmt.Sprintf("healer init failed with error %s, skipping attempt to heal via StandbyNodeUntilCaughtUp", *initErrorMessage)
 		return
@@ -106,8 +112,12 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 			continue
 		}
 
-		if !kavaStatus.SyncInfo.CatchingUp {
-			logMessages <- "StandbyNodeUntilCaughtUp: node caught back up"
+		var secondsBehindLive int64
+		currentSyncTime := kavaStatus.SyncInfo.LatestBlockTime
+		secondsBehindLive = int64(time.Since(currentSyncTime).Seconds())
+
+		if secondsBehindLive <= int64(healerConfig.AutohealSyncToLiveToleranceSeconds) {
+			logMessages <- (fmt.Sprintf("StandbyNodeUntilCaughtUp: node caught back up to %d seconds behind current time", healerConfig.AutohealSyncToLiveToleranceSeconds))
 			break
 		}
 
