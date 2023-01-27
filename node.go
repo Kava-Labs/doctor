@@ -23,6 +23,7 @@ type NodeClientConfig struct {
 	DefaultMonitoringIntervalSeconds    int
 	Autoheal                            bool // whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
 	AutohealSyncLatencyToleranceSeconds int
+	AutohealSyncToLiveToleranceSeconds  int
 }
 
 // NodeClient provides methods
@@ -111,6 +112,9 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			}()
 
 			if nc.config.Autoheal {
+				go func() {
+					logMessages <- fmt.Sprintf("AutoHeal: node %s is %d seconds behind live, AutohealSyncLatencyToleranceSeconds %d, ", nodeState.NodeInfo.Id, secondsBehindLive, nc.config.AutohealSyncLatencyToleranceSeconds)
+				}()
 				if secondsBehindLive > int64(nc.config.AutohealSyncLatencyToleranceSeconds) {
 					go func() {
 						// check to see if there is already a healer working on this issue
@@ -118,6 +122,9 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 
 						// only have one healer working on the same issue at once
 						if nc.healCounter.Count != 0 {
+							go func() {
+								logMessages <- fmt.Sprintf("AutoHeal: node %s is currently being autohealed", nodeState.NodeInfo.Id)
+							}()
 							return
 						}
 
@@ -132,12 +139,20 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						// node, heal thyself
 						go func() {
 							defer func() {
+								go func() {
+									logMessages <- "AutoHeal: releasing lock"
+								}()
 								nc.healCounter.Lock()
-								nc.healCounter.Count++
+								nc.healCounter.Count--
 								nc.healCounter.Unlock()
+								go func() {
+									logMessages <- "AutoHeal: released lock"
+								}()
 							}()
 
-							heal.StandbyNodeUntilCaughtUp(logMessages, nc.Client)
+							heal.StandbyNodeUntilCaughtUp(logMessages, nc.Client, heal.HealerConfig{
+								AutohealSyncToLiveToleranceSeconds: nc.config.AutohealSyncToLiveToleranceSeconds,
+							})
 						}()
 					}()
 				}
