@@ -31,8 +31,7 @@ type NodeClientConfig struct {
 // API and OS shell for a given node
 type NodeClient struct {
 	*kava.Client
-	config      NodeClientConfig
-	healCounter *heal.ActiveHealerCounter
+	config NodeClientConfig
 }
 
 // NewNodeCLient creates and returns a new node client
@@ -46,12 +45,9 @@ func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 		panic(fmt.Errorf("%w: could not initialize kava client", err))
 	}
 
-	healCounter := heal.ActiveHealerCounter{}
-
 	return &NodeClient{
-		config:      config,
-		Client:      kavaClient,
-		healCounter: &healCounter,
+		config: config,
+		Client: kavaClient,
 	}, nil
 }
 
@@ -61,6 +57,8 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 	// create channel that will emit
 	// an event every DefaultMonitoringIntervalSeconds seconds
 	ticker := time.NewTicker(time.Duration(nc.config.DefaultMonitoringIntervalSeconds) * time.Second).C
+
+	var autohealingInProgress bool
 
 	for {
 		select {
@@ -113,49 +111,48 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 
 			if nc.config.Autoheal {
 				go func() {
-					logMessages <- fmt.Sprintf("AutoHeal: node %s is %d seconds behind live, AutohealSyncLatencyToleranceSeconds %d, ", nodeState.NodeInfo.Id, secondsBehindLive, nc.config.AutohealSyncLatencyToleranceSeconds)
+					logMessages <- fmt.Sprintf("AutoHeal: node %s is %d seconds behind live, AutohealSyncLatencyToleranceSeconds %d, ", nodeState.NodeInfo.Id, secondsBehindLive, int64(nc.config.AutohealSyncLatencyToleranceSeconds))
 				}()
 				if secondsBehindLive > int64(nc.config.AutohealSyncLatencyToleranceSeconds) {
 					go func() {
-						// check to see if there is already a healer working on this issue
-						nc.healCounter.Lock()
-
-						// only have one healer working on the same issue at once
-						if nc.healCounter.Count != 0 {
-							go func() {
-								logMessages <- fmt.Sprintf("AutoHeal: node %s is currently being autohealed", nodeState.NodeInfo.Id)
-							}()
-							return
-						}
-
-						nc.healCounter.Count++
-
-						nc.healCounter.Unlock()
-
-						go func() {
-							logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, attempting autohealing actions", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
-						}()
-
-						// node, heal thyself
-						go func() {
-							defer func() {
-								go func() {
-									logMessages <- "AutoHeal: releasing lock"
-								}()
-								nc.healCounter.Lock()
-								nc.healCounter.Count--
-								nc.healCounter.Unlock()
-								go func() {
-									logMessages <- "AutoHeal: released lock"
-								}()
-							}()
-
-							heal.StandbyNodeUntilCaughtUp(logMessages, nc.Client, heal.HealerConfig{
-								AutohealSyncToLiveToleranceSeconds: nc.config.AutohealSyncToLiveToleranceSeconds,
-							})
-						}()
+						logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, checking to see if it is already being healed", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
 					}()
+
+					// check to see if there is already a healer working on this issue
+					if autohealingInProgress {
+						go func() {
+							logMessages <- fmt.Sprintf("AutoHeal: node %s is currently being autohealed", nodeState.NodeInfo.Id)
+						}()
+						continue
+					}
+
+					autohealingInProgress = true
+
+					go func() {
+						logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, attempting autohealing actions", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
+					}()
+
+					// node, heal thyself
+					go func() {
+						defer func() {
+							go func() {
+								logMessages <- "AutoHeal: releasing lock"
+							}()
+							autohealingInProgress = false
+							go func() {
+								logMessages <- "AutoHeal: released lock"
+							}()
+						}()
+
+						heal.StandbyNodeUntilCaughtUp(logMessages, nc.Client, heal.HealerConfig{
+							AutohealSyncToLiveToleranceSeconds: nc.config.AutohealSyncToLiveToleranceSeconds,
+						})
+					}()
+				} else {
+					logMessages <- fmt.Sprintf("node %s is less than %d seconds behind live, doesn't need to be auto healed", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds)
 				}
+			} else {
+				logMessages <- fmt.Sprintf("auto heal not enabled for node %s, skipping autoheal checks", nodeState.NodeInfo.Id)
 			}
 		}
 	}

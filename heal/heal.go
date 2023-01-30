@@ -3,7 +3,6 @@ package heal
 import (
 	"fmt"
 	"os/exec"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -25,15 +24,6 @@ var (
 	awsDoctor        *AwsDoctor
 	initErrorMessage *string
 )
-
-// ActiveHealerCounter wraps values
-// for safe and accurate concurrent
-// book keeping of the number of active
-// healer routines in flight for a given host
-type ActiveHealerCounter struct {
-	sync.Mutex
-	Count int
-}
 
 // HealerConfig wraps values for use by one or more
 // runs of one or more healer routines
@@ -98,6 +88,11 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 		logMessages <- fmt.Sprintf("StandbyNodeUntilCaughtUp: host entered standby state with autoscaling group %+v", state.Activities)
 	} else {
 		logMessages <- "StandbyNodeUntilCaughtUp: host is not currently in service, not moving to standby"
+	}
+
+	if *autoscalingInstances.AutoScalingInstances[0].LifecycleState == autoscaling.LifecycleStateStandby {
+		logMessages <- "StandbyNodeUntilCaughtUp: host was already on standby, will place in service once caught up"
+		placedOnStandby = true
 	}
 
 	// wait until the kava process catches back up to live
