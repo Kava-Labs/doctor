@@ -113,17 +113,20 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 
 			if nc.config.Autoheal {
 				go func() {
-					logMessages <- fmt.Sprintf("AutoHeal: node %s is %d seconds behind live, AutohealSyncLatencyToleranceSeconds %d, ", nodeState.NodeInfo.Id, secondsBehindLive, nc.config.AutohealSyncLatencyToleranceSeconds)
+					logMessages <- fmt.Sprintf("AutoHeal: node %s is %d seconds behind live, AutohealSyncLatencyToleranceSeconds %d, ", nodeState.NodeInfo.Id, secondsBehindLive, int64(nc.config.AutohealSyncLatencyToleranceSeconds))
 				}()
 				if secondsBehindLive > int64(nc.config.AutohealSyncLatencyToleranceSeconds) {
 					go func() {
+						go func() {
+							logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, checking to see if it is already being healed", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
+						}()
 						// check to see if there is already a healer working on this issue
 						nc.healCounter.Lock()
 
 						// only have one healer working on the same issue at once
 						if nc.healCounter.Count != 0 {
 							go func() {
-								logMessages <- fmt.Sprintf("AutoHeal: node %s is currently being autohealed", nodeState.NodeInfo.Id)
+								logMessages <- fmt.Sprintf("AutoHeal: node %s is currently being autohealed, healer count %d", nodeState.NodeInfo.Id, nc.healCounter.Count)
 							}()
 							return
 						}
@@ -155,7 +158,11 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 							})
 						}()
 					}()
+				} else {
+					logMessages <- fmt.Sprintf("node %s is less than %d seconds behind live, doesn't need to be auth healed", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds)
 				}
+			} else {
+				logMessages <- fmt.Sprintf("auto heal not enabled for node %s, skipping autoheal checks", nodeState.NodeInfo.Id)
 			}
 		}
 	}
