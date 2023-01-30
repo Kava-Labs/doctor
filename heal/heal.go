@@ -90,6 +90,11 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 		logMessages <- "StandbyNodeUntilCaughtUp: host is not currently in service, not moving to standby"
 	}
 
+	if *autoscalingInstances.AutoScalingInstances[0].LifecycleState == autoscaling.LifecycleStateStandby {
+		logMessages <- "StandbyNodeUntilCaughtUp: host was already on standby, will place in service once caught up"
+		placedOnStandby = true
+	}
+
 	// wait until the kava process catches back up to live
 	for {
 		kavaStatus, err := awsDoctor.kava.GetNodeState()

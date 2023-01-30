@@ -149,7 +149,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						})
 					}()
 				} else {
-					logMessages <- fmt.Sprintf("node %s is less than %d seconds behind live, doesn't need to be auth healed", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds)
+					logMessages <- fmt.Sprintf("node %s is less than %d seconds behind live, doesn't need to be auto healed", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds)
 				}
 			} else {
 				logMessages <- fmt.Sprintf("auto heal not enabled for node %s, skipping autoheal checks", nodeState.NodeInfo.Id)
