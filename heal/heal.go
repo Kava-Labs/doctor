@@ -31,6 +31,26 @@ type HealerConfig struct {
 	AutohealSyncToLiveToleranceSeconds int
 }
 
+// GetNodeAutoscalingState gets the autoscaling state of the node based off it's instance id
+// returning the state and error (if any).
+func GetNodeAutoscalingState(instanceId string, client *autoscaling.AutoScaling) (string, error) {
+	autoscalingInstances, err := awsDoctor.autoscalingClient.DescribeAutoScalingInstances(&autoscaling.DescribeAutoScalingInstancesInput{
+		InstanceIds: []*string{
+			aws.String(instanceId),
+		},
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("StandbyNodeUntilCaughtUp: error %s checking autoscaling state for instance %s", err, instanceId)
+	}
+
+	if len(autoscalingInstances.AutoScalingInstances) != 1 {
+		return "", fmt.Errorf("StandbyNodeUntilCaughtUp: expected exactly one instance with id %s, got %+v", instanceId, autoscalingInstances.AutoScalingInstances)
+	}
+
+	return *autoscalingInstances.AutoScalingInstances[0].LifecycleState, nil
+}
+
 // StandbyNodeUntilCaughtUp will keep the ec2 instance the kava node is
 // on in standby (to shift resources that would be consumed by an api node
 // serving production client requests towards synching up to live faster)
@@ -125,6 +145,22 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 	if placedOnStandby {
 		var exitedStandby bool
 		for !exitedStandby {
+			currentState, err := GetNodeAutoscalingState(awsInstanceId, awsDoctor.autoscalingClient)
+
+			if err != nil {
+				logMessages <- err.Error()
+
+				continue
+			}
+
+			if currentState == autoscaling.LifecycleStateInService {
+				logMessages <- fmt.Sprint("StandbyNodeUntilCaughtUp: host is no longer on standby")
+
+				exitedStandby = true
+
+				break
+			}
+
 			state, err := awsDoctor.autoscalingClient.ExitStandby(&autoscaling.ExitStandbyInput{
 				AutoScalingGroupName: autoscalingGroupName,
 				InstanceIds: []*string{

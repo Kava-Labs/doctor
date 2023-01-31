@@ -11,6 +11,7 @@ $ doctor --help
 Usage of doctor:
       --autoheal                                          whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
       --autoheal_sync_latency_tolerance_seconds int       how far behind live the node is allowed to fall before autohealing actions are attempted (default 120)
+      --autoheal_sync_to_live_tolerance_seconds int       how close to the current time the node must resync to before being considered in sync again (default 12)
       --aws_region string                                 aws region to use for sending metrics to CloudWatch (default "us-east-1")
       --config_filepath string                            filepath to json config file to use (default "~/.kava/doctor/config.json")
       --debug                                             controls whether debug logging is enabled
@@ -40,7 +41,9 @@ An example configuration file is provided below:
   "metric_collectors": "file,cloudwatch",
   "metric_namespace": "kava/mainnet-archive",
   "aws_region": "us-east-1",
-  "autoheal: true
+  "autohea": true,
+  "autoheal_sync_latency_tolerance_seconds": 120,
+  "autoheal_sync_to_live_tolerance_seconds": 12
 }
 ```
 
