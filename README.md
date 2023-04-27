@@ -4,6 +4,8 @@ Kava application and node infrastructure health monitoring daemon with configura
 
 ## Usage
 
+[System Overview](./docs/imgs/doctor-system-overview.jpg)
+
 ### Configuration
 
 ```bash
