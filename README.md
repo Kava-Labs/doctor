@@ -16,6 +16,7 @@ Usage of doctor:
       --config_filepath string                            filepath to json config file to use (default "~/.kava/doctor/config.json")
       --debug                                             controls whether debug logging is enabled
       --default_monitoring_interval_seconds int           default interval doctor will use for the various monitoring routines (default 5)
+      --health_check_timeout_seconds int                  max number of seconds doctor will wait for a health check response from the endpoint (default 10)
       --interactive                                       controls whether an interactive terminal UI is displayed
       --kava_api_address string                           URL of the endpoint that doctor should monitor (default "https://rpc.data.kava.io")
       --max_metric_samples_to_retain_per_node int         maximum number of metric samples that will be kept in memory per node (default 10000)
@@ -43,7 +44,8 @@ An example configuration file is provided below:
   "aws_region": "us-east-1",
   "autohea": true,
   "autoheal_sync_latency_tolerance_seconds": 120,
-  "autoheal_sync_to_live_tolerance_seconds": 12
+    "autoheal_sync_to_live_tolerance_seconds": 12,
+    "health_check_timeout_seconds": 10,
 }
 ```
 

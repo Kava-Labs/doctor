@@ -24,6 +24,7 @@ type NodeClientConfig struct {
 	Autoheal                            bool // whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
 	AutohealSyncLatencyToleranceSeconds int
 	AutohealSyncToLiveToleranceSeconds  int
+	HealthChecksTimeoutSeconds          int
 }
 
 // NodeClient provides methods
@@ -38,7 +39,8 @@ type NodeClient struct {
 // using the provided configuration
 func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 	kavaClient, err := kava.New(kava.ClientConfig{
-		JSONRPCURL: config.RPCEndpoint,
+		JSONRPCURL:             config.RPCEndpoint,
+		HTTPReadTimeoutSeconds: config.HealthChecksTimeoutSeconds,
 	})
 
 	if err != nil {
