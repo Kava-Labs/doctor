@@ -24,7 +24,10 @@ type NodeClientConfig struct {
 	Autoheal                            bool // whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
 	AutohealSyncLatencyToleranceSeconds int
 	AutohealSyncToLiveToleranceSeconds  int
+	AutohealRestartDelaySeconds         int
 	HealthChecksTimeoutSeconds          int
+	NoNewBlocksRestartThresholdSeconds int
+	DowntimeRestartThresholdSeconds    int
 }
 
 // NodeClient provides methods

@@ -67,7 +67,10 @@ func main() {
 		Autoheal:                            config.Autoheal,
 		AutohealSyncLatencyToleranceSeconds: config.AutohealSyncLatencyToleranceSeconds,
 		AutohealSyncToLiveToleranceSeconds:  config.AutohealSyncToLiveToleranceSeconds,
+		AutohealRestartDelaySeconds:         config.AutohealRestartDelaySeconds,
 		HealthChecksTimeoutSeconds:          config.HealthChecksTimeoutSeconds,
+		NoNewBlocksRestartThresholdSeconds: config.NoNewBlocksRestartThresholdSeconds,
+		DowntimeRestartThresholdSeconds:    config.DowntimeRestartThresholdSeconds,
 	}
 
 	nodeClient, err := NewNodeClient(nodeConfig)
