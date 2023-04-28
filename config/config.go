@@ -35,6 +35,20 @@ const (
 	AutohealFlagName                                   = "autoheal"
 	AutohealSyncLatencyToleranceSecondsFlagName        = "autoheal_sync_latency_tolerance_seconds"
 	AutohealSyncToLiveToleranceSecondsFlagName         = "autoheal_sync_to_live_tolerance_seconds"
+	DowntimeRestartThresholdSecondsFlagName            = "downtime_restart_threshold_seconds"
+	// 5 minutes
+	DefaultDowntimeRestartThresholdSeconds     = 300
+	NoNewBlocksRestartThresholdSecondsFlagName = "no_new_blocks_restart_threshold_seconds"
+	// 5 minutes
+	DefaultNoNewBlocksRestartThresholdSeconds = 300
+	AutohealChecksStartupDelaySecondsFlagName = "autoheal_checks_startup_delay_seconds"
+	// 45 minutes
+	DefaultAutohealChecksStartupDelaySecondsFlag = 2700
+	HealthChecksTimeoutSecondsFlagName           = "health_check_timeout_seconds"
+	DefaultHealthChecksTimeoutSecondsFlagName    = 10
+	AutohealRestartDelaySecondsFlagName          = "autoheal_restart_delay_seconds"
+	// 45 minutes
+	DefaultAutohealRestartDelaySeconds = 2700
 )
 
 const (
@@ -65,6 +79,10 @@ var (
 	autohealFlag                                   = flag.Bool(AutohealFlagName, false, "whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)")
 	autohealSyncLatencyToleranceSecondsFlag        = flag.Int(AutohealSyncLatencyToleranceSecondsFlagName, 120, "how far behind live the node is allowed to fall before autohealing actions are attempted")
 	autohealSyncToLiveToleranceSecondsFlag         = flag.Int(AutohealSyncToLiveToleranceSecondsFlagName, 12, "how close to the current time the node must resync to before being considered in sync again")
+	downtimeRestartThresholdSecondsFlag            = flag.Int(DowntimeRestartThresholdSecondsFlagName, DefaultDowntimeRestartThresholdSeconds, "how many continuous seconds the endpoint being monitored has to be offline or unresponsive before autohealing will be attempted")
+	noNewBlocksRestartThresholdSecondsFlag         = flag.Int(NoNewBlocksRestartThresholdSecondsFlagName, DefaultNoNewBlocksRestartThresholdSeconds, "how many continuous seconds the endpoint being monitored has not produce a new bloc before autohealing will be attempted")
+	healthChecksTimeoutSecondsFlag  = flag.Int(HealthChecksTimeoutSecondsFlagName, DefaultHealthChecksTimeoutSecondsFlagName, "max number of seconds doctor will wait for a health check response from the endpoint")
+	autohealRestartDelaySecondsFlag = flag.Int(AutohealRestartDelaySecondsFlagName, DefaultAutohealRestartDelaySeconds, fmt.Sprintf("number of seconds autohealing routines will wait to restart the endpoint, effective from the last time it was restarted and over riding the values %s %s", DowntimeRestartThresholdSecondsFlagName, NoNewBlocksRestartThresholdSecondsFlagName))
 )
 
 // DoctorConfig wraps values used to configure
@@ -83,6 +101,10 @@ type DoctorConfig struct {
 	Autoheal                                   bool
 	AutohealSyncLatencyToleranceSeconds        int
 	AutohealSyncToLiveToleranceSeconds         int
+	AutohealRestartDelaySeconds                int
+	HealthChecksTimeoutSeconds                 int
+	NoNewBlocksRestartThresholdSeconds int
+	DowntimeRestartThresholdSeconds    int
 }
 
 // GetDoctorConfig gets an instance of DoctorConfig
@@ -178,5 +200,9 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 		Autoheal:                            viper.GetBool(AutohealFlagName),
 		AutohealSyncLatencyToleranceSeconds: viper.GetInt(AutohealSyncLatencyToleranceSecondsFlagName),
 		AutohealSyncToLiveToleranceSeconds:  viper.GetInt(AutohealSyncToLiveToleranceSecondsFlagName),
+		AutohealRestartDelaySeconds:         viper.GetInt(AutohealRestartDelaySecondsFlagName),
+		HealthChecksTimeoutSeconds:          viper.GetInt(HealthChecksTimeoutSecondsFlagName),
+		NoNewBlocksRestartThresholdSeconds: viper.GetInt(NoNewBlocksRestartThresholdSecondsFlagName),
+		DowntimeRestartThresholdSeconds:    viper.GetInt(DowntimeRestartThresholdSecondsFlagName),
 	}, nil
 }

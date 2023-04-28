@@ -20,5 +20,8 @@
 # doctor collected metrics
 *-doctor-metrics.json
 
+# local doctor config
+config.json
+
 # macOS filesystem metadata
 **/.DS_STORE

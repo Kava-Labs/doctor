@@ -24,6 +24,10 @@ type NodeClientConfig struct {
 	Autoheal                            bool // whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
 	AutohealSyncLatencyToleranceSeconds int
 	AutohealSyncToLiveToleranceSeconds  int
+	AutohealRestartDelaySeconds         int
+	HealthChecksTimeoutSeconds          int
+	NoNewBlocksRestartThresholdSeconds  int
+	DowntimeRestartThresholdSeconds     int
 }
 
 // NodeClient provides methods
@@ -38,7 +42,8 @@ type NodeClient struct {
 // using the provided configuration
 func NewNodeClient(config NodeClientConfig) (*NodeClient, error) {
 	kavaClient, err := kava.New(kava.ClientConfig{
-		JSONRPCURL: config.RPCEndpoint,
+		JSONRPCURL:             config.RPCEndpoint,
+		HTTPReadTimeoutSeconds: config.HealthChecksTimeoutSeconds,
 	})
 
 	if err != nil {
@@ -58,7 +63,11 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 	// an event every DefaultMonitoringIntervalSeconds seconds
 	ticker := time.NewTicker(time.Duration(nc.config.DefaultMonitoringIntervalSeconds) * time.Second).C
 
-	var autohealingInProgress bool
+	var outOfSyncAutohealingInProgress bool
+	var lastRestartedByAutohealingAt *time.Time
+	lastNewBlockObservedAt := time.Now()
+	var lastSynchedBlockNumber int64
+	var currentDowntimeStartedAt *time.Time
 
 	for {
 		select {
@@ -68,17 +77,19 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			// get the current sync status of the node
 			// timing how long it takes for the node
 			// to respond to the request as well
-			startTime := time.Now()
+			statusCheckStartedAt := time.Now()
 			nodeState, err := nc.GetNodeState()
-			endTime := time.Now()
+			statusCheckEndedAt := time.Now()
 
 			uptimeMetric := metric.UptimeMetric{
 				EndpointURL: nc.config.RPCEndpoint,
-				SampledAt:   startTime,
+				SampledAt:   statusCheckStartedAt,
 				Up:          true,
 			}
 
 			if err != nil {
+				// send uptime metric to metric collector
+				// for aggregation and storage
 				uptimeMetric.Up = false
 				// log error, but don't block the monitoring
 				// routine if the logMessage channel is full
@@ -87,19 +98,96 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 					uptimeMetrics <- uptimeMetric
 				}()
 
+				// if this is the first time the api was unavailable
+				// or it went down after being restarted
+				// set the start of the downtime window
+				if currentDowntimeStartedAt == nil {
+					logMessages <- fmt.Sprintf("node went offline at %+v", statusCheckStartedAt)
+					downtimeStartedAt := statusCheckStartedAt
+					currentDowntimeStartedAt = &downtimeStartedAt
+				}
+				// TODO: refactor into node.AutohealOfflineNode()
+				if nc.config.Autoheal {
+					// check if the downtime deserves a restart
+					downtimeDuration := statusCheckStartedAt.Sub(*currentDowntimeStartedAt)
+					logMessages <- fmt.Sprintf("node has been down for %+v downtime threshold seconds %v, restart delay seconds", downtimeDuration, nc.config.DowntimeRestartThresholdSeconds, nc.config.AutohealRestartDelaySeconds)
+
+					// if the node was previously restarted
+					// don't restart until AutohealRestartDelaySeconds have passed
+					if lastRestartedByAutohealingAt != nil {
+						if downtimeDuration < time.Duration(time.Duration(nc.config.AutohealRestartDelaySeconds)*time.Second) {
+							logMessages <- fmt.Sprintf("not restarting offline node, current downtime %v last restarted at %v restart delay seconds %d", downtimeDuration, lastRestartedByAutohealingAt, nc.config.AutohealRestartDelaySeconds)
+
+							// keep checking the health of the endpoint
+							continue
+						}
+
+						// restart the node
+						err = heal.RestartKavaService()
+
+						if err != nil {
+							logMessages <- fmt.Sprintf("error %s restarting node", err)
+							// keep checking the health of the endpoint
+							continue
+						}
+
+						// update the last restarted at time
+						now := time.Now()
+						lastRestartedByAutohealingAt = &now
+
+						logMessages <- fmt.Sprintf("restarted node at %v", lastRestartedByAutohealingAt)
+
+						// reset downtime clock
+						currentDowntimeStartedAt = nil
+
+						// keep checking the health of the endpoint
+						continue
+					}
+
+					// otherwise only restart the node if it's been down long enough
+					if downtimeDuration > time.Duration(time.Duration(nc.config.DowntimeRestartThresholdSeconds)*time.Second) {
+						// this is the first time the node is being restarted
+						// for the current downtime window
+						// restart the node
+						err = heal.RestartKavaService()
+
+						if err != nil {
+							logMessages <- fmt.Sprintf("error %s restarting node", err)
+							// keep checking the health of the endpoint
+							continue
+						}
+
+						// update the last restarted at time
+						now := time.Now()
+						lastRestartedByAutohealingAt = &now
+
+						logMessages <- fmt.Sprintf("restarted node at %v", lastRestartedByAutohealingAt)
+
+						// reset downtime clock
+						currentDowntimeStartedAt = nil
+
+						// keep checking the health of the endpoint
+						continue
+					}
+
+					logMessages <- fmt.Sprintf("not restarting node, down for %v seconds, downtime threshold seconds %v", downtimeDuration, nc.config.DowntimeRestartThresholdSeconds)
+
+				}
+
 				// keep watching
 				continue
 			}
 
 			var secondsBehindLive int64
 			currentSyncTime := nodeState.SyncInfo.LatestBlockTime
+			currentBlockNumber := nodeState.SyncInfo.LatestBlockHeight
 			secondsBehindLive = int64(time.Since(currentSyncTime).Seconds())
 
 			metrics := metric.SyncStatusMetrics{
-				SampledAt:                 startTime,
+				SampledAt:                 statusCheckStartedAt,
 				NodeId:                    nodeState.NodeInfo.Id,
 				SyncStatus:                nodeState.SyncInfo,
-				SampleLatencyMilliseconds: endTime.Sub(startTime).Milliseconds(),
+				SampleLatencyMilliseconds: statusCheckEndedAt.Sub(statusCheckStartedAt).Milliseconds(),
 				SecondsBehindLive:         secondsBehindLive,
 			}
 
@@ -109,6 +197,16 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				uptimeMetrics <- uptimeMetric
 			}()
 
+			// if the node has synched any new blocks since the last block
+			if currentBlockNumber > lastSynchedBlockNumber {
+				// update frozen node health indicator
+				lastNewBlockObservedAt = statusCheckEndedAt
+				logMessages <- fmt.Sprintf("node has synched new blocks since last check")
+			} else {
+				logMessages <- fmt.Sprintf("node has been frozen since %v,NoNewBlocksRestartThresholdSeconds %d", lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
+			}
+
+			// TODO: refactor into node.AutohealOutOfSyncNode()
 			if nc.config.Autoheal {
 				go func() {
 					logMessages <- fmt.Sprintf("AutoHeal: node %s is %d seconds behind live, AutohealSyncLatencyToleranceSeconds %d, ", nodeState.NodeInfo.Id, secondsBehindLive, int64(nc.config.AutohealSyncLatencyToleranceSeconds))
@@ -119,14 +217,14 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 					}()
 
 					// check to see if there is already a healer working on this issue
-					if autohealingInProgress {
+					if outOfSyncAutohealingInProgress {
 						go func() {
 							logMessages <- fmt.Sprintf("AutoHeal: node %s is currently being autohealed", nodeState.NodeInfo.Id)
 						}()
 						continue
 					}
 
-					autohealingInProgress = true
+					outOfSyncAutohealingInProgress = true
 
 					go func() {
 						logMessages <- fmt.Sprintf("node %s is more than %d seconds behind live: %d, attempting autohealing actions", nodeState.NodeInfo.Id, nc.config.AutohealSyncLatencyToleranceSeconds, secondsBehindLive)
@@ -138,7 +236,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 							go func() {
 								logMessages <- "AutoHeal: releasing lock"
 							}()
-							autohealingInProgress = false
+							outOfSyncAutohealingInProgress = false
 							go func() {
 								logMessages <- "AutoHeal: released lock"
 							}()
@@ -154,6 +252,68 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			} else {
 				logMessages <- fmt.Sprintf("auto heal not enabled for node %s, skipping autoheal checks", nodeState.NodeInfo.Id)
 			}
+
+			// TODO: refactor into node.AutohealFrozenNode()
+			if nc.config.Autoheal {
+				// check if the node has been frozen long enough to deserve a restart
+				frozenDuration := time.Now().Sub(lastNewBlockObservedAt)
+
+				if frozenDuration > time.Duration(time.Duration(nc.config.NoNewBlocksRestartThresholdSeconds)*time.Second) {
+					// if the node was previously restarted
+					// don't restart until AutohealRestartDelaySeconds have passed
+					if lastRestartedByAutohealingAt != nil {
+						if frozenDuration < time.Duration(time.Duration(nc.config.AutohealRestartDelaySeconds)*time.Second) {
+							logMessages <- fmt.Sprintf("not restarting frozen node, current freezetime %v last restarted at %v restart delay seconds %d", frozenDuration, lastRestartedByAutohealingAt, nc.config.AutohealRestartDelaySeconds)
+
+							// keep checking the health of the endpoint
+							continue
+						}
+
+						// restart the node
+						err = heal.RestartKavaService()
+
+						if err != nil {
+							logMessages <- fmt.Sprintf("error %s restarting node", err)
+							// keep checking the health of the endpoint
+							continue
+						}
+
+						// update the last restarted at time
+						now := time.Now()
+						lastRestartedByAutohealingAt = &now
+
+						logMessages <- fmt.Sprintf("restarted node at %v", lastRestartedByAutohealingAt)
+
+						// keep checking the health of the endpoint
+						continue
+					}
+
+					logMessages <- fmt.Sprintf("autohealing frozen node, last block synched at %v,NoNewBlocksRestartThresholdSeconds %d", lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
+
+					// restart the node
+					err = heal.RestartKavaService()
+
+					if err != nil {
+						logMessages <- fmt.Sprintf("error %s restarting node", err)
+						// keep checking the health of the endpoint
+						continue
+					}
+
+					// update the last restarted at time
+					now := time.Now()
+					lastRestartedByAutohealingAt = &now
+
+					logMessages <- fmt.Sprintf("restarted node at %v", lastRestartedByAutohealingAt)
+
+					// keep checking the health of the endpoint
+					continue
+				}
+
+				logMessages <- fmt.Sprintf("not restarting node, frozen for %v seconds, frozen threshold seconds %v", frozenDuration, nc.config.NoNewBlocksRestartThresholdSeconds)
+			}
+
+			// update frozen node health indicator
+			lastSynchedBlockNumber = currentBlockNumber
 		}
 	}
 }

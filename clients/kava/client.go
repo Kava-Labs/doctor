@@ -5,12 +5,14 @@ package kava
 import (
 	"log"
 	"net/http"
+	"time"
 )
 
 // ClientConfig wraps parameters
 // for configuring a kava node client
 type ClientConfig struct {
-	JSONRPCURL string
+	JSONRPCURL             string
+	HTTPReadTimeoutSeconds int
 }
 
 // Client is used for communicating with
@@ -26,7 +28,7 @@ type Client struct {
 func New(config ClientConfig) (*Client, error) {
 	return &Client{
 		Client: &http.Client{
-			// TODO: configure timeouts, logging from config values
+			Timeout: time.Duration(time.Duration(config.HTTPReadTimeoutSeconds) * time.Second),
 		},
 		config: config,
 	}, nil

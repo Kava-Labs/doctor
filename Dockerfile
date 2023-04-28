@@ -30,6 +30,10 @@ COPY Makefile ./
 COPY *.go go.mod go.sum ./
 
 COPY clients/ clients/
+COPY collect/ collect/
+COPY metric/ metric/
+COPY heal/ heal/
+COPY config/ config/
 
 COPY .env ./
 
