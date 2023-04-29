@@ -203,7 +203,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				lastNewBlockObservedAt = statusCheckEndedAt
 				logMessages <- fmt.Sprintf("node has synched new blocks since last check")
 			} else {
-				logMessages <- fmt.Sprintf("node has been frozen since %v,NoNewBlocksRestartThresholdSeconds %d", lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
+				logMessages <- fmt.Sprintf("node has been frozen for %d seconds since %vNoNewBlocksRestartThresholdSeconds %d", statusCheckEndedAt.Sub(lastNewBlockObservedAt).Seconds(), lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
 			}
 
 			// TODO: refactor into node.AutohealOutOfSyncNode()
@@ -309,7 +309,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 					continue
 				}
 
-				logMessages <- fmt.Sprintf("not restarting node, frozen for %v seconds, frozen threshold seconds %v", frozenDuration, nc.config.NoNewBlocksRestartThresholdSeconds)
+				logMessages <- fmt.Sprintf("not restarting node, frozen for %v seconds, frozen threshold seconds %v", frozenDuration.Seconds(), nc.config.NoNewBlocksRestartThresholdSeconds)
 			}
 
 			// update frozen node health indicator
