@@ -81,8 +81,8 @@ var (
 	autohealSyncToLiveToleranceSecondsFlag         = flag.Int(AutohealSyncToLiveToleranceSecondsFlagName, 12, "how close to the current time the node must resync to before being considered in sync again")
 	downtimeRestartThresholdSecondsFlag            = flag.Int(DowntimeRestartThresholdSecondsFlagName, DefaultDowntimeRestartThresholdSeconds, "how many continuous seconds the endpoint being monitored has to be offline or unresponsive before autohealing will be attempted")
 	noNewBlocksRestartThresholdSecondsFlag         = flag.Int(NoNewBlocksRestartThresholdSecondsFlagName, DefaultNoNewBlocksRestartThresholdSeconds, "how many continuous seconds the endpoint being monitored has not produce a new bloc before autohealing will be attempted")
-	healthChecksTimeoutSecondsFlag  = flag.Int(HealthChecksTimeoutSecondsFlagName, DefaultHealthChecksTimeoutSecondsFlagName, "max number of seconds doctor will wait for a health check response from the endpoint")
-	autohealRestartDelaySecondsFlag = flag.Int(AutohealRestartDelaySecondsFlagName, DefaultAutohealRestartDelaySeconds, fmt.Sprintf("number of seconds autohealing routines will wait to restart the endpoint, effective from the last time it was restarted and over riding the values %s %s", DowntimeRestartThresholdSecondsFlagName, NoNewBlocksRestartThresholdSecondsFlagName))
+	healthChecksTimeoutSecondsFlag                 = flag.Int(HealthChecksTimeoutSecondsFlagName, DefaultHealthChecksTimeoutSecondsFlagName, "max number of seconds doctor will wait for a health check response from the endpoint")
+	autohealRestartDelaySecondsFlag                = flag.Int(AutohealRestartDelaySecondsFlagName, DefaultAutohealRestartDelaySeconds, fmt.Sprintf("number of seconds autohealing routines will wait to restart the endpoint, effective from the last time it was restarted and over riding the values %s %s", DowntimeRestartThresholdSecondsFlagName, NoNewBlocksRestartThresholdSecondsFlagName))
 )
 
 // DoctorConfig wraps values used to configure
@@ -103,8 +103,8 @@ type DoctorConfig struct {
 	AutohealSyncToLiveToleranceSeconds         int
 	AutohealRestartDelaySeconds                int
 	HealthChecksTimeoutSeconds                 int
-	NoNewBlocksRestartThresholdSeconds int
-	DowntimeRestartThresholdSeconds    int
+	NoNewBlocksRestartThresholdSeconds         int
+	DowntimeRestartThresholdSeconds            int
 }
 
 // GetDoctorConfig gets an instance of DoctorConfig
@@ -202,7 +202,7 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 		AutohealSyncToLiveToleranceSeconds:  viper.GetInt(AutohealSyncToLiveToleranceSecondsFlagName),
 		AutohealRestartDelaySeconds:         viper.GetInt(AutohealRestartDelaySecondsFlagName),
 		HealthChecksTimeoutSeconds:          viper.GetInt(HealthChecksTimeoutSecondsFlagName),
-		NoNewBlocksRestartThresholdSeconds: viper.GetInt(NoNewBlocksRestartThresholdSecondsFlagName),
-		DowntimeRestartThresholdSeconds:    viper.GetInt(DowntimeRestartThresholdSecondsFlagName),
+		NoNewBlocksRestartThresholdSeconds:  viper.GetInt(NoNewBlocksRestartThresholdSecondsFlagName),
+		DowntimeRestartThresholdSeconds:     viper.GetInt(DowntimeRestartThresholdSecondsFlagName),
 	}, nil
 }

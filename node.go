@@ -110,13 +110,13 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				if nc.config.Autoheal {
 					// check if the downtime deserves a restart
 					downtimeDuration := statusCheckStartedAt.Sub(*currentDowntimeStartedAt)
-					logMessages <- fmt.Sprintf("node has been down for %+v downtime threshold seconds %v, restart delay seconds", downtimeDuration, nc.config.DowntimeRestartThresholdSeconds, nc.config.AutohealRestartDelaySeconds)
+					logMessages <- fmt.Sprintf("node has been down for %+v downtime threshold seconds %v, restart delay seconds %d", downtimeDuration, nc.config.DowntimeRestartThresholdSeconds, nc.config.AutohealRestartDelaySeconds)
 
 					// if the node was previously restarted
 					// don't restart until AutohealRestartDelaySeconds have passed
 					if lastRestartedByAutohealingAt != nil {
 						if downtimeDuration < time.Duration(time.Duration(nc.config.AutohealRestartDelaySeconds)*time.Second) {
-							logMessages <- fmt.Sprintf("not restarting offline node, current downtime %v last restarted at %v restart delay seconds %d", downtimeDuration, lastRestartedByAutohealingAt, nc.config.AutohealRestartDelaySeconds)
+							logMessages <- fmt.Sprintf("not restarting offline node, current downtime %v last restarted %f seconds ago at %v restart delay seconds %d", downtimeDuration, time.Since(*lastRestartedByAutohealingAt).Seconds(), lastRestartedByAutohealingAt, nc.config.AutohealRestartDelaySeconds)
 
 							// keep checking the health of the endpoint
 							continue
@@ -203,7 +203,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				lastNewBlockObservedAt = statusCheckEndedAt
 				logMessages <- fmt.Sprintf("node has synched new blocks since last check")
 			} else {
-				logMessages <- fmt.Sprintf("node has been frozen for %d seconds since %vNoNewBlocksRestartThresholdSeconds %d", statusCheckEndedAt.Sub(lastNewBlockObservedAt).Seconds(), lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
+				logMessages <- fmt.Sprintf("node has been frozen for %f seconds since %v\n NoNewBlocksRestartThresholdSeconds %d", statusCheckEndedAt.Sub(lastNewBlockObservedAt).Seconds(), lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
 			}
 
 			// TODO: refactor into node.AutohealOutOfSyncNode()
@@ -221,7 +221,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						go func() {
 							logMessages <- fmt.Sprintf("AutoHeal: node %s is currently being autohealed", nodeState.NodeInfo.Id)
 						}()
-						continue
+						goto AutohealFrozenNodeBegin
 					}
 
 					outOfSyncAutohealingInProgress = true
@@ -253,6 +253,8 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				logMessages <- fmt.Sprintf("auto heal not enabled for node %s, skipping autoheal checks", nodeState.NodeInfo.Id)
 			}
 
+		AutohealFrozenNodeBegin:
+
 			// TODO: refactor into node.AutohealFrozenNode()
 			if nc.config.Autoheal {
 				// check if the node has been frozen long enough to deserve a restart
@@ -263,7 +265,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 					// don't restart until AutohealRestartDelaySeconds have passed
 					if lastRestartedByAutohealingAt != nil {
 						if frozenDuration < time.Duration(time.Duration(nc.config.AutohealRestartDelaySeconds)*time.Second) {
-							logMessages <- fmt.Sprintf("not restarting frozen node, current freezetime %v last restarted at %v restart delay seconds %d", frozenDuration, lastRestartedByAutohealingAt, nc.config.AutohealRestartDelaySeconds)
+							logMessages <- fmt.Sprintf("not restarting frozen node, current freezetime %v last restarted %f seconds ago at %v restart delay seconds %d", frozenDuration, time.Since(*lastRestartedByAutohealingAt).Seconds(), lastRestartedByAutohealingAt, nc.config.AutohealRestartDelaySeconds)
 
 							// keep checking the health of the endpoint
 							continue
