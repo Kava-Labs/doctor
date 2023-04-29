@@ -286,6 +286,9 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 
 						logMessages <- fmt.Sprintf("restarted node at %v", lastRestartedByAutohealingAt)
 
+						// reset frozen clock
+						lastNewBlockObservedAt = time.Now()
+
 						// keep checking the health of the endpoint
 						continue
 					}
@@ -306,6 +309,9 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 					lastRestartedByAutohealingAt = &now
 
 					logMessages <- fmt.Sprintf("restarted node at %v", lastRestartedByAutohealingAt)
+
+					// reset frozen clock
+					lastNewBlockObservedAt = time.Now()
 
 					// keep checking the health of the endpoint
 					continue
