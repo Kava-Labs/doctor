@@ -154,7 +154,7 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 			}
 
 			if currentState == autoscaling.LifecycleStateInService {
-				logMessages <- fmt.Sprint("StandbyNodeUntilCaughtUp: host is no longer on standby")
+				logMessages <- "StandbyNodeUntilCaughtUp: host is no longer on standby"
 
 				exitedStandby = true
 
@@ -184,14 +184,14 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 	logMessages <- "StandbyNodeUntilCaughtUp: node healed successfully by doctor"
 }
 
-// RestartKavaService restarts the kava service
+// RestartBlockchainService restarts the blockchain service
 // returning error (if any)
-func RestartKavaService() error {
+func RestartBlockchainService() error {
 	cmd := exec.Command("bash", "-c", "sudo systemctl restart kava")
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
-		return fmt.Errorf("error %s starting kava service output %s", err, string(output))
+		return fmt.Errorf("error %s starting blockchain service output %s", err, string(output))
 	}
 
 	return nil

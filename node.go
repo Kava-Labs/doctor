@@ -123,7 +123,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						}
 
 						// restart the node
-						err = heal.RestartKavaService()
+						err = heal.RestartBlockchainService()
 
 						if err != nil {
 							logMessages <- fmt.Sprintf("error %s restarting node", err)
@@ -149,7 +149,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						// this is the first time the node is being restarted
 						// for the current downtime window
 						// restart the node
-						err = heal.RestartKavaService()
+						err = heal.RestartBlockchainService()
 
 						if err != nil {
 							logMessages <- fmt.Sprintf("error %s restarting node", err)
@@ -272,7 +272,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						}
 
 						// restart the node
-						err = heal.RestartKavaService()
+						err = heal.RestartBlockchainService()
 
 						if err != nil {
 							logMessages <- fmt.Sprintf("error %s restarting node", err)
@@ -296,7 +296,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 					logMessages <- fmt.Sprintf("autohealing frozen node, last block synched at %v,NoNewBlocksRestartThresholdSeconds %d", lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
 
 					// restart the node
-					err = heal.RestartKavaService()
+					err = heal.RestartBlockchainService()
 
 					if err != nil {
 						logMessages <- fmt.Sprintf("error %s restarting node", err)
