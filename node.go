@@ -123,7 +123,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						}
 
 						// restart the node
-						err = heal.RestartBlockchainService()
+						err = nc.RestartBlockchainService()
 
 						if err != nil {
 							logMessages <- fmt.Sprintf("error %s restarting node", err)
@@ -149,7 +149,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						// this is the first time the node is being restarted
 						// for the current downtime window
 						// restart the node
-						err = heal.RestartBlockchainService()
+						err = nc.RestartBlockchainService()
 
 						if err != nil {
 							logMessages <- fmt.Sprintf("error %s restarting node", err)
@@ -201,7 +201,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			if currentBlockNumber > lastSynchedBlockNumber {
 				// update frozen node health indicator
 				lastNewBlockObservedAt = statusCheckEndedAt
-				logMessages <- fmt.Sprintf("node has synched new blocks since last check")
+				logMessages <- "node has synched new blocks since last check"
 			} else {
 				logMessages <- fmt.Sprintf("node has been frozen for %f seconds since %v\n NoNewBlocksRestartThresholdSeconds %d", statusCheckEndedAt.Sub(lastNewBlockObservedAt).Seconds(), lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
 			}
@@ -258,7 +258,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			// TODO: refactor into node.AutohealFrozenNode()
 			if nc.config.Autoheal {
 				// check if the node has been frozen long enough to deserve a restart
-				frozenDuration := time.Now().Sub(lastNewBlockObservedAt)
+				frozenDuration := time.Since(lastNewBlockObservedAt)
 
 				if frozenDuration > time.Duration(time.Duration(nc.config.NoNewBlocksRestartThresholdSeconds)*time.Second) {
 					// if the node was previously restarted
@@ -272,7 +272,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 						}
 
 						// restart the node
-						err = heal.RestartBlockchainService()
+						err = nc.RestartBlockchainService()
 
 						if err != nil {
 							logMessages <- fmt.Sprintf("error %s restarting node", err)
@@ -296,7 +296,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 					logMessages <- fmt.Sprintf("autohealing frozen node, last block synched at %v,NoNewBlocksRestartThresholdSeconds %d", lastNewBlockObservedAt, nc.config.NoNewBlocksRestartThresholdSeconds)
 
 					// restart the node
-					err = heal.RestartBlockchainService()
+					err = nc.RestartBlockchainService()
 
 					if err != nil {
 						logMessages <- fmt.Sprintf("error %s restarting node", err)
@@ -324,4 +324,10 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 			lastSynchedBlockNumber = currentBlockNumber
 		}
 	}
+}
+
+// RestartBlockchainService wraps a call to restart the service
+// returning error (if any)
+func (nc *NodeClient) RestartBlockchainService() error {
+	return heal.RestartBlockchainService()
 }
