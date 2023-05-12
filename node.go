@@ -22,6 +22,7 @@ type NodeClientConfig struct {
 	RPCEndpoint                         string
 	DefaultMonitoringIntervalSeconds    int
 	Autoheal                            bool // whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
+	AutohealBlockchainServiceName       string
 	AutohealSyncLatencyToleranceSeconds int
 	AutohealSyncToLiveToleranceSeconds  int
 	AutohealRestartDelaySeconds         int
@@ -329,5 +330,5 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 // RestartBlockchainService restarts the blockchain's systemd service
 // returning error (if any)
 func (nc *NodeClient) RestartBlockchainService() error {
-	return heal.RestartSystemdService("kava")
+	return heal.RestartSystemdService(nc.config.AutohealBlockchainServiceName)
 }
