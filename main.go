@@ -65,6 +65,7 @@ func main() {
 		RPCEndpoint:                         config.KavaNodeRPCURL,
 		DefaultMonitoringIntervalSeconds:    config.DefaultMonitoringIntervalSeconds,
 		Autoheal:                            config.Autoheal,
+		AutohealBlockchainServiceName:       config.AutohealBlockchainServiceName,
 		AutohealSyncLatencyToleranceSeconds: config.AutohealSyncLatencyToleranceSeconds,
 		AutohealSyncToLiveToleranceSeconds:  config.AutohealSyncToLiveToleranceSeconds,
 		AutohealRestartDelaySeconds:         config.AutohealRestartDelaySeconds,

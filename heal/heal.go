@@ -154,7 +154,7 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 			}
 
 			if currentState == autoscaling.LifecycleStateInService {
-				logMessages <- fmt.Sprint("StandbyNodeUntilCaughtUp: host is no longer on standby")
+				logMessages <- "StandbyNodeUntilCaughtUp: host is no longer on standby"
 
 				exitedStandby = true
 
@@ -184,14 +184,13 @@ func StandbyNodeUntilCaughtUp(logMessages chan<- string, kavaClient *kava.Client
 	logMessages <- "StandbyNodeUntilCaughtUp: node healed successfully by doctor"
 }
 
-// RestartKavaService restarts the kava service
+// RestartSystemdService restarts a systemd service by name
 // returning error (if any)
-func RestartKavaService() error {
-	cmd := exec.Command("bash", "-c", "sudo systemctl restart kava")
+func RestartSystemdService(serviceName string) error {
+	cmd := exec.Command("bash", "-c", fmt.Sprintf("sudo systemctl restart %s", serviceName))
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
-		return fmt.Errorf("error %s starting kava service output %s", err, string(output))
+		return fmt.Errorf("error %s starting %s service output %s", err, serviceName, string(output))
 	}
 
 	return nil
