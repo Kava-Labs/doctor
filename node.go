@@ -326,8 +326,8 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 	}
 }
 
-// RestartBlockchainService wraps a call to restart the service
+// RestartBlockchainService restarts the blockchain's systemd service
 // returning error (if any)
 func (nc *NodeClient) RestartBlockchainService() error {
-	return heal.RestartBlockchainService()
+	return heal.RestartSystemdService("kava")
 }
