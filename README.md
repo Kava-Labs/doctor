@@ -12,6 +12,7 @@ Kava application and node infrastructure health monitoring daemon with configura
 $ doctor --help
 Usage of doctor:
       --autoheal                                          whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)
+      --autoheal_blockchain_service_name string           the name of the systemd service running the blockchain. this is the service that gets restarted in the autoheal process (default "kava")
       --autoheal_restart_delay_seconds int                number of seconds autohealing routines will wait to restart the endpoint, effective from the last time it was restarted and over riding the values downtime_restart_threshold_seconds no_new_blocks_restart_threshold_seconds (default 2700)
       --autoheal_sync_latency_tolerance_seconds int       how far behind live the node is allowed to fall before autohealing actions are attempted (default 120)
       --autoheal_sync_to_live_tolerance_seconds int       how close to the current time the node must resync to before being considered in sync again (default 12)
@@ -48,6 +49,7 @@ An example configuration file is provided below:
     "metric_namespace": "kava/mainnet-archive",
     "aws_region": "us-east-1",
     "autoheal": true,
+    "autoheal_blockchain_service_name": "kava",
     "autoheal_sync_latency_tolerance_seconds": 120,
     "autoheal_sync_to_live_tolerance_seconds": 12,
     "downtime_restart_threshold_seconds": 300,
