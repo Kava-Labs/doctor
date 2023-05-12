@@ -33,6 +33,7 @@ const (
 	AWSRegionFlagName                                  = "aws_region"
 	MetricNamespaceFlagName                            = "metric_namespace"
 	AutohealFlagName                                   = "autoheal"
+	AutohealBlockchainServiceNameFlagName              = "autoheal_blockchain_service_name"
 	AutohealSyncLatencyToleranceSecondsFlagName        = "autoheal_sync_latency_tolerance_seconds"
 	AutohealSyncToLiveToleranceSecondsFlagName         = "autoheal_sync_to_live_tolerance_seconds"
 	DowntimeRestartThresholdSecondsFlagName            = "downtime_restart_threshold_seconds"
@@ -77,6 +78,7 @@ var (
 	awsRegionFlag                                  = flag.String(AWSRegionFlagName, "us-east-1", "aws region to use for sending metrics to CloudWatch")
 	metricNamespaceFlag                            = flag.String(MetricNamespaceFlagName, "kava", "top level namespace to use for grouping all metrics sent to cloudwatch")
 	autohealFlag                                   = flag.Bool(AutohealFlagName, false, "whether doctor should take active measures to attempt to heal the kava process (e.g. place on standby if it falls significantly behind live)")
+	autohealBlockchainServiceNameFlag              = flag.String(AutohealBlockchainServiceNameFlagName, "kava", "the name of the systemd service running the blockchain. this is the service that gets restarted in the autoheal process")
 	autohealSyncLatencyToleranceSecondsFlag        = flag.Int(AutohealSyncLatencyToleranceSecondsFlagName, 120, "how far behind live the node is allowed to fall before autohealing actions are attempted")
 	autohealSyncToLiveToleranceSecondsFlag         = flag.Int(AutohealSyncToLiveToleranceSecondsFlagName, 12, "how close to the current time the node must resync to before being considered in sync again")
 	downtimeRestartThresholdSecondsFlag            = flag.Int(DowntimeRestartThresholdSecondsFlagName, DefaultDowntimeRestartThresholdSeconds, "how many continuous seconds the endpoint being monitored has to be offline or unresponsive before autohealing will be attempted")
@@ -99,6 +101,7 @@ type DoctorConfig struct {
 	MetricNamespace                            string
 	Logger                                     *log.Logger
 	Autoheal                                   bool
+	AutohealBlockchainServiceName              string
 	AutohealSyncLatencyToleranceSeconds        int
 	AutohealSyncToLiveToleranceSeconds         int
 	AutohealRestartDelaySeconds                int
@@ -198,6 +201,7 @@ func GetDoctorConfig() (*DoctorConfig, error) {
 		AWSRegion:                           viper.GetString(AWSRegionFlagName),
 		MetricNamespace:                     viper.GetString(MetricNamespaceFlagName),
 		Autoheal:                            viper.GetBool(AutohealFlagName),
+		AutohealBlockchainServiceName:       viper.GetString(AutohealBlockchainServiceNameFlagName),
 		AutohealSyncLatencyToleranceSeconds: viper.GetInt(AutohealSyncLatencyToleranceSecondsFlagName),
 		AutohealSyncToLiveToleranceSeconds:  viper.GetInt(AutohealSyncToLiveToleranceSecondsFlagName),
 		AutohealRestartDelaySeconds:         viper.GetInt(AutohealRestartDelaySecondsFlagName),
