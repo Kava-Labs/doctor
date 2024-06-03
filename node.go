@@ -65,6 +65,7 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 	ticker := time.NewTicker(time.Duration(nc.config.DefaultMonitoringIntervalSeconds) * time.Second).C
 
 	var outOfSyncAutohealingInProgress bool
+	var nodePutOnStandbyAtStartup bool
 	var lastRestartedByAutohealingAt *time.Time
 	lastNewBlockObservedAt := time.Now()
 	var lastSynchedBlockNumber int64
@@ -109,6 +110,14 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 				}
 				// TODO: refactor into node.AutohealOfflineNode()
 				if nc.config.Autoheal {
+
+					// make sure the node is placed on standby if we cannot get node status.
+					// if node is not put on standby while down, elb will destroy it.
+					if !nodePutOnStandbyAtStartup {
+						heal.PlaceNodeOnStandByIfInService(logMessages, nc.Client)
+						nodePutOnStandbyAtStartup = true
+					}
+
 					// check if the downtime deserves a restart
 					downtimeDuration := statusCheckStartedAt.Sub(*currentDowntimeStartedAt)
 					logMessages <- fmt.Sprintf("node has been down for %+v downtime threshold seconds %v, restart delay seconds %d", downtimeDuration, nc.config.DowntimeRestartThresholdSeconds, nc.config.AutohealRestartDelaySeconds)

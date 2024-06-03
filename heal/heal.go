@@ -51,6 +51,55 @@ func GetNodeAutoscalingState(instanceId string, client *autoscaling.AutoScaling)
 	return *autoscalingInstances.AutoScalingInstances[0].LifecycleState, nil
 }
 
+func PlaceNodeOnStandByIfInService(logMessages chan<- string, kavaClient *kava.Client) {
+	awsDoctor.kava = kavaClient
+	awsInstanceId := awsDoctor.instanceId
+
+	// check to see if the host is in service
+	autoscalingInstances, err := awsDoctor.autoscalingClient.DescribeAutoScalingInstances(&autoscaling.DescribeAutoScalingInstancesInput{
+		InstanceIds: []*string{
+			aws.String(awsInstanceId),
+		},
+	})
+
+	if err != nil {
+		logMessages <- fmt.Sprintf("PlaceNodeOnStandByIfInService: error %s checking autoscaling state for instance %s", err, awsInstanceId)
+		return
+	}
+
+	if len(autoscalingInstances.AutoScalingInstances) != 1 {
+		logMessages <- fmt.Sprintf("PlaceNodeOnStandByIfInService: expected exactly one instance with id %s, got %+v", awsInstanceId, autoscalingInstances.AutoScalingInstances)
+		return
+	}
+
+	autoscalingGroupName := autoscalingInstances.AutoScalingInstances[0].AutoScalingGroupName
+	// place the host in standby with the autoscaling group
+	// if it's in service so it won't get any more requests
+	// until it syncs back to live
+	if *autoscalingInstances.AutoScalingInstances[0].LifecycleState == autoscaling.LifecycleStateInService {
+		state, err := awsDoctor.autoscalingClient.EnterStandby(&autoscaling.EnterStandbyInput{
+			AutoScalingGroupName: autoscalingGroupName,
+			InstanceIds: []*string{
+				aws.String(awsInstanceId),
+			},
+			ShouldDecrementDesiredCapacity: aws.Bool(true),
+		})
+
+		if err != nil {
+			logMessages <- fmt.Sprintf("PlaceNodeOnStandByIfInService: error %s placing host on standby", err)
+			return
+		}
+
+		logMessages <- fmt.Sprintf("PlaceNodeOnStandByIfInService: host entered standby state with autoscaling group %+v", state.Activities)
+	} else {
+		logMessages <- "PlaceNodeOnStandByIfInService: host is not currently in service, not moving to standby"
+	}
+
+	if *autoscalingInstances.AutoScalingInstances[0].LifecycleState == autoscaling.LifecycleStateStandby {
+		logMessages <- "PlaceNodeOnStandByIfInService: host was already on standby, won't be placed on standby"
+	}
+}
+
 // StandbyNodeUntilCaughtUp will keep the ec2 instance the kava node is
 // on in standby (to shift resources that would be consumed by an api node
 // serving production client requests towards synching up to live faster)
