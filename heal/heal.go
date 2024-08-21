@@ -41,11 +41,11 @@ func GetNodeAutoscalingState(instanceId string, client *autoscaling.AutoScaling)
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("StandbyNodeUntilCaughtUp: error %s checking autoscaling state for instance %s", err, instanceId)
+		return "", fmt.Errorf("GetNodeAutoscalingState: error %s checking autoscaling state for instance %s", err, instanceId)
 	}
 
 	if len(autoscalingInstances.AutoScalingInstances) != 1 {
-		return "", fmt.Errorf("StandbyNodeUntilCaughtUp: expected exactly one instance with id %s, got %+v", instanceId, autoscalingInstances.AutoScalingInstances)
+		return "", fmt.Errorf("GetNodeAutoscalingState: expected exactly one instance with id %s, got %+v", instanceId, autoscalingInstances.AutoScalingInstances)
 	}
 
 	return *autoscalingInstances.AutoScalingInstances[0].LifecycleState, nil
