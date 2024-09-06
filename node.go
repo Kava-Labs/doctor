@@ -26,6 +26,7 @@ type NodeClientConfig struct {
 	AutohealSyncLatencyToleranceSeconds int
 	AutohealSyncToLiveToleranceSeconds  int
 	AutohealRestartDelaySeconds         int
+	AutohealInitialAllowedDelaySeconds  int
 	HealthChecksTimeoutSeconds          int
 	NoNewBlocksRestartThresholdSeconds  int
 	DowntimeRestartThresholdSeconds     int
@@ -69,6 +70,8 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 	lastNewBlockObservedAt := time.Now()
 	var lastSynchedBlockNumber int64
 	var currentDowntimeStartedAt *time.Time
+
+	earliestAllowedRestartTime := time.Now().Add(time.Duration(nc.config.AutohealInitialAllowedDelaySeconds) * time.Second)
 
 	for {
 		select {
@@ -258,6 +261,13 @@ func (nc *NodeClient) WatchSyncStatus(ctx context.Context, syncStatusMetrics cha
 
 			// TODO: refactor into node.AutohealFrozenNode()
 			if nc.config.Autoheal {
+				// if configured, allow an initial buffer from service start to first autoheal restart
+				// if we are still in that initial buffer. if so, continue checking the health
+				if time.Now().Before(earliestAllowedRestartTime) {
+					logMessages <- fmt.Sprintf("not restarting frozen node, still in initial restart delay buffer: buffer %d sec, first restart allowed at %s", nc.config.AutohealInitialAllowedDelaySeconds, earliestAllowedRestartTime)
+					continue
+				}
+
 				// check if the node has been frozen long enough to deserve a restart
 				frozenDuration := time.Since(lastNewBlockObservedAt)
 

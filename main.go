@@ -69,6 +69,7 @@ func main() {
 		AutohealSyncLatencyToleranceSeconds: config.AutohealSyncLatencyToleranceSeconds,
 		AutohealSyncToLiveToleranceSeconds:  config.AutohealSyncToLiveToleranceSeconds,
 		AutohealRestartDelaySeconds:         config.AutohealRestartDelaySeconds,
+		AutohealInitialAllowedDelaySeconds:  config.AutohealInitialAllowedDelaySeconds,
 		HealthChecksTimeoutSeconds:          config.HealthChecksTimeoutSeconds,
 		NoNewBlocksRestartThresholdSeconds:  config.NoNewBlocksRestartThresholdSeconds,
 		DowntimeRestartThresholdSeconds:     config.DowntimeRestartThresholdSeconds,
